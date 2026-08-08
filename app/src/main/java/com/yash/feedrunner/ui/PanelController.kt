@@ -17,6 +17,7 @@ import androidx.compose.runtime.setValue
 import com.yash.feedrunner.BuildConfig
 import com.yash.feedrunner.api.ClaudeClient
 import com.yash.feedrunner.api.ClaudeException
+import com.yash.feedrunner.data.ReadState
 import com.yash.feedrunner.data.ResultStore
 import com.yash.feedrunner.work.AnalysisManager
 import com.yash.feedrunner.data.VoiceRulesStore
@@ -40,6 +41,7 @@ class PanelController(
     private val worker = Executors.newSingleThreadExecutor()
     private val window = OverlayWindow(context, windowManager)
     private val voiceRulesStore = VoiceRulesStore(context)
+    private val readState = ReadState(context)
 
     private val claude: ClaudeClient? by lazy {
         BuildConfig.ANTHROPIC_API_KEY
@@ -85,6 +87,7 @@ class PanelController(
     fun showFinished(resultId: Long) {
         val stored = resultStore.load(resultId) ?: return
         watchedJobId = null
+        readState.markViewed(stored.savedAtMillis)
         postContext = stored.postContext
         currentResultId = stored.savedAtMillis
         state = PanelState.Ready(
@@ -121,6 +124,7 @@ class PanelController(
     }
 
     private fun showStored(target: StoredResult, all: List<StoredResult>) {
+        readState.markViewed(target.savedAtMillis)
         postContext = target.postContext
         currentResultId = target.savedAtMillis
         state = PanelState.Ready(

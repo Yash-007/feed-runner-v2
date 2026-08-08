@@ -23,6 +23,7 @@ import android.widget.TextView
 import android.widget.Toast
 import com.yash.feedrunner.capture.AutoScrollCapture
 import com.yash.feedrunner.capture.CaptureService
+import com.yash.feedrunner.data.ReadState
 import com.yash.feedrunner.data.ResultStore
 import com.yash.feedrunner.ui.MenuAnchor
 import com.yash.feedrunner.ui.MenuController
@@ -49,6 +50,9 @@ class BubbleService : Service() {
     private var bubbleIcon: ImageView? = null
     private var bubbleCount: TextView? = null
 
+    /** Small corner badge showing results generated but not yet opened. */
+    private var bubbleBadge: TextView? = null
+
     /** Layout params of the bubble window — also used to anchor the action menu. */
     private var bubbleParams: WindowManager.LayoutParams? = null
 
@@ -62,6 +66,7 @@ class BubbleService : Service() {
     private var pendingAnalyses = 0
 
     private lateinit var resultStore: ResultStore
+    private lateinit var readState: ReadState
     private lateinit var analysisManager: AnalysisManager
     private lateinit var panelController: PanelController
     private lateinit var menuController: MenuController
@@ -72,6 +77,7 @@ class BubbleService : Service() {
         super.onCreate()
         windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
         resultStore = ResultStore(this)
+        readState = ReadState(this)
         analysisManager = AnalysisManager(this, resultStore)
         panelController = PanelController(
             this,
@@ -81,6 +87,7 @@ class BubbleService : Service() {
         ) { panelVisible ->
             // Hide the bubble while the panel is up so it doesn't sit on the scrim.
             bubbleView?.visibility = if (panelVisible) View.GONE else View.VISIBLE
+            if (!panelVisible) refreshUnreadBadge()
         }
 
         analysisManager.onActiveCountChanged = { count ->
@@ -113,21 +120,26 @@ class BubbleService : Service() {
      * a toast otherwise, so a result generated while scrolling is never silent.
      */
     private fun onAnalysisUpdate(update: AnalysisManager.Update) {
+        val watched = panelController.isWatching(update.jobId)
         when (update) {
-            is AnalysisManager.Update.Done ->
-                if (panelController.isWatching(update.jobId)) {
+            is AnalysisManager.Update.Done -> {
+                if (watched) {
                     panelController.showFinished(update.resultId)
                 } else {
                     val who = update.author.takeIf { it.isNotBlank() } ?: "that post"
                     Toast.makeText(this, "Drafts ready for $who", Toast.LENGTH_SHORT).show()
                 }
+                // Showing it in the panel marks it read, so recount either way.
+                refreshUnreadBadge()
+            }
 
-            is AnalysisManager.Update.Failed ->
-                if (panelController.isWatching(update.jobId)) {
+            is AnalysisManager.Update.Failed -> {
+                if (watched) {
                     panelController.showFailure(update.message)
                 } else {
                     Toast.makeText(this, update.message, Toast.LENGTH_LONG).show()
                 }
+            }
         }
     }
 
@@ -197,6 +209,21 @@ class BubbleService : Service() {
             ),
         )
 
+        val badge = TextView(this).apply {
+            textSize = 10f
+            gravity = Gravity.CENTER
+            setTextColor(android.graphics.Color.WHITE)
+            setTypeface(typeface, android.graphics.Typeface.BOLD)
+            setBackgroundResource(com.yash.feedrunner.R.drawable.badge_bg)
+            // Above the circle's own elevation so it is never drawn underneath.
+            elevation = dp(10f).toFloat()
+            visibility = View.GONE
+        }
+        root.addView(
+            badge,
+            FrameLayout.LayoutParams(dp(20f), dp(20f), Gravity.TOP or Gravity.END),
+        )
+
         root.setOnTouchListener(DragTouchListener(params, onTap = ::onBubbleTapped))
 
         windowManager.addView(root, params)
@@ -204,7 +231,9 @@ class BubbleService : Service() {
         bubbleCircle = circle
         bubbleIcon = icon
         bubbleCount = count
+        bubbleBadge = badge
         bubbleParams = params
+        refreshUnreadBadge()
     }
 
     private fun onBubbleTapped() {
@@ -320,6 +349,19 @@ class BubbleService : Service() {
      * count while analyses run in the background. Capturing wins when both are
      * true, because that one is about to end.
      */
+    /** Counts results saved since the last one you opened. */
+    private fun refreshUnreadBadge() {
+        val badge = bubbleBadge ?: return
+        val watermark = readState.lastViewedAt
+        val unread = resultStore.loadAll().count { it.savedAtMillis > watermark }
+        if (unread == 0) {
+            badge.visibility = View.GONE
+        } else {
+            badge.text = if (unread > 9) "9+" else unread.toString()
+            badge.visibility = View.VISIBLE
+        }
+    }
+
     private fun refreshBubbleBadge() {
         val circle = bubbleCircle ?: return
         val frames = holdFrames
