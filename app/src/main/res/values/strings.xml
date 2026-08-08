@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="capture_service_desc">Lets Feed Runner capture the visible post when you tap the floating bubble. Nothing is captured without a tap.</string>
+</resources>

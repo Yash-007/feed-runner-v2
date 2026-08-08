@@ -1,0 +1,411 @@
+package com.yash.feedrunner.bubble
+
+import android.app.Notification
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
+import android.app.Service
+import android.content.Context
+import android.content.Intent
+import android.graphics.Bitmap
+import android.graphics.PixelFormat
+import android.os.Environment
+import android.os.IBinder
+import android.provider.Settings
+import android.util.TypedValue
+import android.view.Gravity
+import android.view.MotionEvent
+import android.view.View
+import android.view.ViewConfiguration
+import android.view.WindowManager
+import android.widget.FrameLayout
+import android.widget.ImageView
+import android.widget.TextView
+import android.widget.Toast
+import com.yash.feedrunner.capture.AutoScrollCapture
+import com.yash.feedrunner.capture.CaptureService
+import com.yash.feedrunner.data.ResultStore
+import com.yash.feedrunner.ui.MenuAnchor
+import com.yash.feedrunner.ui.MenuController
+import com.yash.feedrunner.ui.PanelController
+import java.io.File
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+import kotlin.math.abs
+
+/**
+ * Foreground service that hosts the floating bubble over other apps.
+ *
+ * Tapping the bubble opens a three-action menu: Capture (this screen),
+ * Hold (auto-scroll and stitch), and Last result (reopen the stored analysis
+ * with no capture and no API call). Dragging moves the bubble.
+ */
+class BubbleService : Service() {
+
+    private lateinit var windowManager: WindowManager
+
+    /** Outer window-sized container; also the drag target. */
+    private var bubbleView: View? = null
+
+    /** The visible gradient circle inside [bubbleView]. */
+    private var bubbleCircle: FrameLayout? = null
+    private var bubbleIcon: ImageView? = null
+    private var bubbleCount: TextView? = null
+
+    /** Layout params of the bubble window — also used to anchor the action menu. */
+    private var bubbleParams: WindowManager.LayoutParams? = null
+
+    /** Non-null while an auto-scroll capture ("Hold") is running. */
+    private var autoCapture: AutoScrollCapture? = null
+
+    private lateinit var resultStore: ResultStore
+    private lateinit var panelController: PanelController
+    private lateinit var menuController: MenuController
+
+    override fun onBind(intent: Intent?): IBinder? = null
+
+    override fun onCreate() {
+        super.onCreate()
+        windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
+        resultStore = ResultStore(this)
+        panelController = PanelController(this, windowManager, resultStore) { panelVisible ->
+            // Hide the bubble while the panel is up so it doesn't sit on the scrim.
+            bubbleView?.visibility = if (panelVisible) View.GONE else View.VISIBLE
+        }
+        menuController = MenuController(
+            context = this,
+            windowManager = windowManager,
+            resultStore = resultStore,
+            onCapture = ::startSingleCapture,
+            onHold = ::startAutoCapture,
+            onLastResult = { panelController.showLastResult() },
+        )
+        startForeground(NOTIFICATION_ID, buildNotification())
+        addBubble()
+    }
+
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        if (intent?.action == ACTION_STOP) {
+            stopSelf()
+            return START_NOT_STICKY
+        }
+        return START_STICKY
+    }
+
+    override fun onDestroy() {
+        autoCapture?.stop()
+        menuController.dismiss()
+        panelController.dismiss()
+        bubbleView?.let { runCatching { windowManager.removeView(it) } }
+        bubbleView = null
+        bubbleParams = null
+        super.onDestroy()
+    }
+
+    private fun addBubble() {
+        // The window is larger than the visible circle so the drop shadow has
+        // room to render instead of being clipped at the window edge.
+        val windowSize = dp(BUBBLE_WINDOW_DP)
+        val circleSize = dp(BUBBLE_CIRCLE_DP)
+
+        val params = WindowManager.LayoutParams(
+            windowSize,
+            windowSize,
+            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
+            PixelFormat.TRANSLUCENT,
+        ).apply {
+            gravity = Gravity.TOP or Gravity.START
+            x = resources.displayMetrics.widthPixels - windowSize - dp(4f)
+            y = resources.displayMetrics.heightPixels / 3
+        }
+
+        val root = FrameLayout(this).apply {
+            clipChildren = false
+            clipToPadding = false
+        }
+
+        val circle = FrameLayout(this).apply {
+            setBackgroundResource(com.yash.feedrunner.R.drawable.bubble_bg)
+            elevation = dp(8f).toFloat()
+        }
+        root.addView(
+            circle,
+            FrameLayout.LayoutParams(circleSize, circleSize, Gravity.CENTER),
+        )
+
+        val icon = ImageView(this).apply {
+            setImageResource(com.yash.feedrunner.R.drawable.ic_spark)
+        }
+        circle.addView(
+            icon,
+            FrameLayout.LayoutParams(dp(25f), dp(25f), Gravity.CENTER),
+        )
+
+        // Shown in place of the icon while a Hold capture is counting frames.
+        val count = TextView(this).apply {
+            textSize = 16f
+            gravity = Gravity.CENTER
+            setTextColor(android.graphics.Color.WHITE)
+            visibility = View.GONE
+        }
+        circle.addView(
+            count,
+            FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT,
+            ),
+        )
+
+        root.setOnTouchListener(DragTouchListener(params, onTap = ::onBubbleTapped))
+
+        windowManager.addView(root, params)
+        bubbleView = root
+        bubbleCircle = circle
+        bubbleIcon = icon
+        bubbleCount = count
+        bubbleParams = params
+    }
+
+    private fun onBubbleTapped() {
+        val active = autoCapture
+        if (active != null) {
+            // Tap while auto-capturing = stop and stitch what we have.
+            active.stop()
+            return
+        }
+        if (menuController.isShowing) {
+            menuController.dismiss()
+            return
+        }
+        val params = bubbleParams ?: return
+        val bubbleSize = bubbleView?.width?.takeIf { it > 0 } ?: dp(BUBBLE_WINDOW_DP)
+        val screenWidth = resources.displayMetrics.widthPixels
+        menuController.show(
+            MenuAnchor(
+                bubbleX = params.x,
+                bubbleY = params.y,
+                bubbleSize = bubbleSize,
+                dockedRight = params.x + bubbleSize / 2 > screenWidth / 2,
+                screenWidth = screenWidth,
+                screenHeight = resources.displayMetrics.heightPixels,
+            ),
+        )
+    }
+
+    private fun startSingleCapture() {
+        takeScreenshotThen { bitmap ->
+            saveCapture(bitmap)
+            // PanelController owns the bitmap from here (thumbnail, then recycle).
+            panelController.analyze(bitmap)
+        }
+    }
+
+    private fun startAutoCapture() {
+        val captureService = CaptureService.instance
+        if (captureService == null) {
+            promptEnableCaptureService()
+            return
+        }
+
+        Toast.makeText(this, "Scrolling & capturing… tap bubble to stop", Toast.LENGTH_SHORT).show()
+        autoCapture = AutoScrollCapture(
+            service = captureService,
+            statusBarPx = statusBarHeightPx(),
+            screenHeightPx = resources.displayMetrics.heightPixels,
+            hideBubble = { onHidden ->
+                bubbleView?.visibility = View.INVISIBLE
+                bubbleView?.postDelayed(onHidden, 150) ?: onHidden()
+            },
+            showBubble = { bubbleView?.visibility = View.VISIBLE },
+            onProgress = { frames -> updateBubbleBadge(frames) },
+            onFinished = { stitched, frames ->
+                autoCapture = null
+                updateBubbleBadge(null)
+                if (stitched == null) {
+                    Toast.makeText(this, "Capture failed", Toast.LENGTH_SHORT).show()
+                } else {
+                    saveCapture(stitched)
+                    // Milestone 3: slice the stitched image into readable segments
+                    // before sending — very tall images get downscaled by the API.
+                    panelController.analyze(stitched)
+                }
+            },
+        ).also { it.start() }
+    }
+
+    private fun promptEnableCaptureService() {
+        Toast.makeText(
+            this,
+            "Enable Feed Runner in Accessibility settings first",
+            Toast.LENGTH_LONG,
+        ).show()
+        startActivity(
+            Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+        )
+    }
+
+    private fun statusBarHeightPx(): Int {
+        val id = resources.getIdentifier("status_bar_height", "dimen", "android")
+        return if (id > 0) resources.getDimensionPixelSize(id) else dp(28f)
+    }
+
+    /** Hides the bubble, captures the screen, restores the bubble, and delivers the bitmap. */
+    private fun takeScreenshotThen(onBitmap: (Bitmap) -> Unit) {
+        val captureService = CaptureService.instance
+        if (captureService == null) {
+            promptEnableCaptureService()
+            return
+        }
+
+        val bubble = bubbleView ?: return
+        bubble.visibility = View.INVISIBLE
+        bubble.postDelayed({
+            captureService.capture { bitmap, errorCode ->
+                bubble.visibility = View.VISIBLE
+                if (bitmap == null) {
+                    val hint = if (errorCode == 3) "tapped too fast, wait a second" else "code $errorCode"
+                    Toast.makeText(this, "Capture failed ($hint)", Toast.LENGTH_SHORT).show()
+                } else {
+                    onBitmap(bitmap)
+                }
+            }
+        }, 150)
+    }
+
+    /** Spark icon when idle; warm gradient with a frame count while capturing. */
+    private fun updateBubbleBadge(frameCount: Int?) {
+        val circle = bubbleCircle ?: return
+        if (frameCount == null) {
+            circle.setBackgroundResource(com.yash.feedrunner.R.drawable.bubble_bg)
+            bubbleIcon?.visibility = View.VISIBLE
+            bubbleCount?.visibility = View.GONE
+        } else {
+            circle.setBackgroundResource(com.yash.feedrunner.R.drawable.bubble_bg_recording)
+            bubbleIcon?.visibility = View.GONE
+            bubbleCount?.apply {
+                text = frameCount.toString()
+                visibility = View.VISIBLE
+            }
+        }
+    }
+
+    private fun saveCapture(bitmap: Bitmap): File {
+        val dir = getExternalFilesDir(Environment.DIRECTORY_PICTURES)!!
+        val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
+        val file = File(dir, "capture_$timestamp.jpg")
+        file.outputStream().use { out ->
+            bitmap.compress(Bitmap.CompressFormat.JPEG, 85, out)
+        }
+        return file
+    }
+
+
+    /**
+     * Tap opens the action menu; dragging moves the bubble and snaps it to the
+     * nearest edge. Touch slop keeps a sloppy tap from being read as a drag.
+     */
+    private inner class DragTouchListener(
+        private val params: WindowManager.LayoutParams,
+        private val onTap: () -> Unit,
+    ) : View.OnTouchListener {
+        private val touchSlop = ViewConfiguration.get(this@BubbleService).scaledTouchSlop
+        private var startX = 0
+        private var startY = 0
+        private var downRawX = 0f
+        private var downRawY = 0f
+        private var dragging = false
+
+        override fun onTouch(v: View, event: MotionEvent): Boolean {
+            when (event.actionMasked) {
+                MotionEvent.ACTION_DOWN -> {
+                    startX = params.x
+                    startY = params.y
+                    downRawX = event.rawX
+                    downRawY = event.rawY
+                    dragging = false
+                    return true
+                }
+                MotionEvent.ACTION_MOVE -> {
+                    val dx = event.rawX - downRawX
+                    val dy = event.rawY - downRawY
+                    if (!dragging && (abs(dx) > touchSlop || abs(dy) > touchSlop)) {
+                        dragging = true
+                    }
+                    if (dragging) {
+                        params.x = startX + dx.toInt()
+                        params.y = startY + dy.toInt()
+                        windowManager.updateViewLayout(v, params)
+                    }
+                    return true
+                }
+                MotionEvent.ACTION_UP -> {
+                    if (dragging) snapToEdge(v) else onTap()
+                    return true
+                }
+            }
+            return false
+        }
+
+        private fun snapToEdge(v: View) {
+            val screenWidth = resources.displayMetrics.widthPixels
+            val margin = dp(4f)
+            params.x = if (params.x + v.width / 2 < screenWidth / 2) {
+                margin
+            } else {
+                screenWidth - v.width - margin
+            }
+            windowManager.updateViewLayout(v, params)
+        }
+    }
+
+    private fun buildNotification(): Notification {
+        val channel = NotificationChannel(
+            CHANNEL_ID,
+            "Bubble",
+            NotificationManager.IMPORTANCE_LOW,
+        )
+        getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
+
+        val stopIntent = PendingIntent.getService(
+            this,
+            0,
+            Intent(this, BubbleService::class.java).setAction(ACTION_STOP),
+            PendingIntent.FLAG_IMMUTABLE,
+        )
+
+        return Notification.Builder(this, CHANNEL_ID)
+            .setSmallIcon(android.R.drawable.ic_menu_send)
+            .setContentTitle("Feed Runner active")
+            .setContentText("Bubble is floating over your screen")
+            .addAction(Notification.Action.Builder(null, "Stop", stopIntent).build())
+            .setOngoing(true)
+            .build()
+    }
+
+    private fun dp(value: Float): Int = TypedValue.applyDimension(
+        TypedValue.COMPLEX_UNIT_DIP, value, resources.displayMetrics,
+    ).toInt()
+
+    companion object {
+        const val ACTION_STOP = "com.yash.feedrunner.STOP_BUBBLE"
+        private const val CHANNEL_ID = "bubble"
+        private const val NOTIFICATION_ID = 1
+
+        /** Visible circle, and the larger window that leaves room for its shadow. */
+        private const val BUBBLE_CIRCLE_DP = 52f
+        private const val BUBBLE_WINDOW_DP = 68f
+
+        fun start(context: Context) {
+            context.startForegroundService(Intent(context, BubbleService::class.java))
+        }
+
+        fun stop(context: Context) {
+            context.startService(
+                Intent(context, BubbleService::class.java).setAction(ACTION_STOP),
+            )
+        }
+    }
+}
