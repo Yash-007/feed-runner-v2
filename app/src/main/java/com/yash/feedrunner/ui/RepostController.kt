@@ -6,21 +6,30 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.os.Handler
 import android.os.Looper
+import android.util.Log
 import android.view.Gravity
 import android.view.WindowManager
+import android.widget.Toast
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import com.yash.feedrunner.data.ResultStore
+import com.yash.feedrunner.BuildConfig
+import com.yash.feedrunner.api.ClaudeClient
+import com.yash.feedrunner.api.ClaudeException
+import com.yash.feedrunner.api.ImagePrep
+import com.yash.feedrunner.data.VoiceRulesStore
 import java.io.File
+import java.util.concurrent.Executors
 
 /**
- * Owns the repost composer overlay: capture in, optional steer, captions out.
+ * Owns the compose overlay: capture in, optional thought or instruction, six
+ * post or quote drafts out.
  *
- * The suggestion call is still a stub. Everything around it (window, keyboard,
- * capture handling, copy, selection) is real, so the flow can be judged before
- * the prompt and response shape are settled.
+ * Generation runs on a background executor and is deliberately not cancelled by
+ * dismissing the sheet, which was the complaint about the reply flow. If it
+ * lands while the sheet is closed you get a toast, and the result is held so
+ * reopening Repost shows it instead of a blank composer.
  */
 class RepostController(
     private val context: Context,
@@ -28,30 +37,69 @@ class RepostController(
     private val onVisibilityChanged: (visible: Boolean) -> Unit,
 ) {
     private val handler = Handler(Looper.getMainLooper())
+    private val worker = Executors.newSingleThreadExecutor()
     private val window = OverlayWindow(context, windowManager)
+    private val voiceRulesStore = VoiceRulesStore(context)
     private val captureDir = File(context.filesDir, "repost").apply { mkdirs() }
 
+    private val claude: ClaudeClient? by lazy {
+        BuildConfig.ANTHROPIC_API_KEY.takeIf { it.isNotBlank() }?.let { ClaudeClient(it) }
+    }
+
     private var state by mutableStateOf<RepostState>(RepostState.Composing)
-    private var steer by mutableStateOf("")
+    private var mode by mutableStateOf(RepostMode.POST)
+    private var userText by mutableStateOf("")
     private var capturePath by mutableStateOf<String?>(null)
+
+    /** Set when a generation finished while the sheet was closed. */
+    private var heldResult: RepostResult? = null
 
     val isShowing: Boolean get() = window.isShowing
 
-    /** Opens the composer for [screenshot], with the keyboard already up. */
+    val hasHeldResult: Boolean get() = heldResult != null
+
+    /** Opens the composer for a fresh capture, with the keyboard already up. */
     fun start(screenshot: Bitmap) {
-        state = RepostState.Composing
-        steer = ""
         capturePath = writeCapture(screenshot)
         screenshot.recycle()
+        state = RepostState.Composing
+        userText = ""
+        heldResult = null
+        open()
+    }
 
+    /** Reopens drafts that finished while the sheet was closed. No new API call. */
+    fun showHeldResult() {
+        val held = heldResult ?: return
+        mode = held.mode
+        capturePath = held.capturePath
+        state = RepostState.Ready(held)
+        open()
+    }
+
+    fun dismiss() {
+        window.setFocusable(false)
+        window.dismiss()
+        onVisibilityChanged(false)
+    }
+
+    fun shutdown() {
+        dismiss()
+        worker.shutdownNow()
+        handler.removeCallbacksAndMessages(null)
+    }
+
+    private fun open() {
         window.show(gravity = Gravity.BOTTOM) {
             MaterialTheme {
                 RepostPanel(
                     state = state,
+                    mode = mode,
                     capturePath = capturePath,
-                    steer = steer,
-                    onSteerChange = { steer = it },
-                    onSuggest = ::suggest,
+                    userText = userText,
+                    onModeChange = { mode = it },
+                    onUserTextChange = { userText = it },
+                    onGenerate = ::generate,
                     onCopyText = ::copyText,
                     onFocusChanged = window::setFocusable,
                     onDismiss = ::dismiss,
@@ -63,51 +111,96 @@ class RepostController(
         onVisibilityChanged(true)
     }
 
-    fun dismiss() {
-        handler.removeCallbacksAndMessages(null)
-        window.setFocusable(false)
-        window.dismiss()
-        onVisibilityChanged(false)
-    }
-
-    /**
-     * STUB. Replace with the real caption call once the prompt and response shape
-     * are defined; the state machine and UI above do not need to change.
-     */
-    private fun suggest() {
-        state = RepostState.Loading
-        val given = steer.trim()
-        handler.postDelayed({
-            state = RepostState.Ready(
-                listOf(
-                    CaptionSuggestion(
-                        id = 0,
-                        note = "STUB — steer was: ${given.ifEmpty { "(none)" }}",
-                        text = "placeholder caption one",
-                    ),
-                    CaptionSuggestion(id = 1, note = "STUB", text = "placeholder caption two"),
-                    CaptionSuggestion(id = 2, note = "STUB", text = "placeholder caption three"),
-                ),
+    private fun generate() {
+        val client = claude
+        if (client == null) {
+            state = RepostState.Error(
+                "No API key. Add anthropic.apiKey to local.properties and rebuild.",
             )
-        }, STUB_DELAY_MS)
+            return
+        }
+        val path = capturePath
+        if (path == null) {
+            state = RepostState.Error("Capture was lost. Try again.")
+            return
+        }
+
+        state = RepostState.Loading
+        val requestedMode = mode
+        val text = userText.trim()
+        val voiceRules = voiceRulesStore.rules
+
+        worker.execute {
+            val outcome = runCatching {
+                val bitmap = decodeScaledForApi(path)
+                    ?: throw ClaudeException("Could not read the capture. Try again.")
+                val segments = ImagePrep.toBase64Segments(bitmap)
+                client.suggestPosts(requestedMode, segments, text, voiceRules)
+            }
+
+            handler.post {
+                outcome
+                    .onSuccess { analysis ->
+                        val result = RepostResult(
+                            mode = requestedMode,
+                            capture = analysis.capture,
+                            reading = analysis.reading,
+                            drafts = analysis.drafts,
+                            capturePath = path,
+                            savedAtMillis = System.currentTimeMillis(),
+                        )
+                        if (window.isShowing) {
+                            heldResult = null
+                            state = RepostState.Ready(result)
+                        } else {
+                            // Closed mid-flight: hold it rather than throw it away.
+                            heldResult = result
+                            Toast.makeText(
+                                context,
+                                "${requestedMode.label} drafts ready, tap Repost to see them",
+                                Toast.LENGTH_LONG,
+                            ).show()
+                        }
+                    }
+                    .onFailure { error ->
+                        Log.w(TAG, "Post generation failed", error)
+                        val message = when (error) {
+                            is ClaudeException -> error.message ?: "Something went wrong."
+                            else -> error.message?.takeIf { it.isNotBlank() }
+                                ?.let { "Request failed: $it" }
+                                ?: "Request failed. Check your connection."
+                        }
+                        if (window.isShowing) {
+                            state = RepostState.Error(message)
+                        } else {
+                            Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+                        }
+                    }
+            }
+        }
     }
 
     private fun copyText(text: String) {
         val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-        clipboard.setPrimaryClip(ClipData.newPlainText("caption", text))
+        clipboard.setPrimaryClip(ClipData.newPlainText("post", text))
     }
 
     /**
-     * Repost captures are transient, so one file is reused rather than added to
-     * [ResultStore], which keeps a pruned history of reply results.
+     * Reads the capture back from disk rather than holding the bitmap, so a
+     * generation that outlives the sheet cannot be holding megabytes of it.
      */
+    private fun decodeScaledForApi(path: String): Bitmap? =
+        android.graphics.BitmapFactory.decodeFile(path)
+
     private fun writeCapture(source: Bitmap): String? = runCatching {
-        val file = File(captureDir, "repost_capture.jpg")
+        val file = File(captureDir, "capture_${System.currentTimeMillis()}.jpg")
         file.outputStream().use { source.compress(Bitmap.CompressFormat.JPEG, 85, it) }
+        // Only the newest capture is ever needed; drop the rest.
+        captureDir.listFiles()?.forEach { if (it != file) it.delete() }
         file.absolutePath
     }.getOrNull()
 
     private companion object {
-        const val STUB_DELAY_MS = 900L
+        const val TAG = "RepostController"
     }
 }

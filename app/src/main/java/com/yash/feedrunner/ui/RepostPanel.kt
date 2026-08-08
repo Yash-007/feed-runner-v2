@@ -5,8 +5,9 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
@@ -52,7 +53,9 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
@@ -60,24 +63,33 @@ import kotlinx.coroutines.delay
 private val SheetShape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp)
 
 /**
- * Composer for reposting or quoting the captured post.
+ * Composer for posting about the capture, or quote-posting on top of it.
  *
- * The steer is optional, so suggesting is always available: you can type nothing
- * and just ask. The field takes focus on open so the keyboard is already up,
- * which is the whole point of the flow.
+ * The text field is deliberately vague about what to type, because the prompt
+ * decides for itself whether what you wrote is a thought to build on or an
+ * instruction to follow. Which way it read you comes back in the result and is
+ * shown there, so a misread is visible rather than silent.
  */
 @Composable
 fun RepostPanel(
     state: RepostState,
+    mode: RepostMode,
     capturePath: String?,
-    steer: String,
-    onSteerChange: (String) -> Unit,
-    onSuggest: () -> Unit,
+    userText: String,
+    onModeChange: (RepostMode) -> Unit,
+    onUserTextChange: (String) -> Unit,
+    onGenerate: () -> Unit,
     onCopyText: (String) -> Unit,
     onFocusChanged: (Boolean) -> Unit,
     onDismiss: () -> Unit,
 ) {
     var viewerPath by remember { mutableStateOf<String?>(null) }
+    val scrollState = rememberScrollState()
+
+    // Drop to the drafts as soon as they land; the composer is above them.
+    LaunchedEffect(state) {
+        if (state is RepostState.Ready) scrollState.animateScrollTo(scrollState.maxValue)
+    }
 
     Box(
         modifier = Modifier
@@ -92,13 +104,13 @@ fun RepostPanel(
             tonalElevation = 8.dp,
             modifier = Modifier
                 .fillMaxWidth()
-                .heightIn(max = 600.dp)
+                .heightIn(max = 620.dp)
                 .imePadding()
                 .clickable(enabled = false) {},
         ) {
             Column(
                 modifier = Modifier
-                    .verticalScroll(rememberScrollState())
+                    .verticalScroll(scrollState)
                     .padding(16.dp),
             ) {
                 Row(
@@ -106,7 +118,7 @@ fun RepostPanel(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
-                        text = "Repost",
+                        text = "Compose",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                         modifier = Modifier.weight(1f),
@@ -114,29 +126,33 @@ fun RepostPanel(
                     TextButton(onClick = onDismiss) { Text("Close") }
                 }
 
-                CapturedPostRow(
-                    capturePath = capturePath,
-                    onView = { viewerPath = it },
+                ModeToggle(
+                    mode = mode,
+                    enabled = state !is RepostState.Loading,
+                    onModeChange = onModeChange,
                 )
 
+                CapturedRow(capturePath = capturePath, onView = { viewerPath = it })
+
                 Composer(
-                    steer = steer,
+                    mode = mode,
+                    userText = userText,
                     enabled = state !is RepostState.Loading,
-                    onSteerChange = onSteerChange,
+                    onUserTextChange = onUserTextChange,
                     onFocusChanged = onFocusChanged,
-                    onSuggest = onSuggest,
+                    onGenerate = onGenerate,
                 )
 
                 when (state) {
                     is RepostState.Composing -> Unit
-                    is RepostState.Loading -> SuggestingRow()
+                    is RepostState.Loading -> GeneratingRow(mode)
                     is RepostState.Error -> Text(
                         text = state.message,
                         style = MaterialTheme.typography.bodyMedium,
-                        modifier = Modifier.padding(top = 14.dp),
+                        modifier = Modifier.padding(top = 16.dp),
                     )
-                    is RepostState.Ready -> Captions(
-                        captions = state.captions,
+                    is RepostState.Ready -> Results(
+                        result = state.result,
                         onCopyText = onCopyText,
                     )
                 }
@@ -149,21 +165,72 @@ fun RepostPanel(
     }
 }
 
-/** The post being captioned, as a preview you can open full-screen. */
+/** Post vs Quote. The single most consequential choice here, so it leads. */
 @Composable
-private fun CapturedPostRow(capturePath: String?, onView: (String) -> Unit) {
+private fun ModeToggle(
+    mode: RepostMode,
+    enabled: Boolean,
+    onModeChange: (RepostMode) -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .padding(top = 12.dp)
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(22.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+            .padding(3.dp),
+    ) {
+        RepostMode.entries.forEach { option ->
+            val selected = option == mode
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier
+                    .weight(1f)
+                    .clip(RoundedCornerShape(19.dp))
+                    .background(
+                        if (selected) MaterialTheme.colorScheme.surface else Color.Transparent,
+                    )
+                    .clickable(enabled = enabled && !selected) { onModeChange(option) }
+                    .padding(vertical = 9.dp),
+            ) {
+                Text(
+                    text = option.label,
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                    color = if (selected) {
+                        MaterialTheme.colorScheme.onSurface
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    },
+                )
+            }
+        }
+    }
+    Text(
+        text = when (mode) {
+            RepostMode.POST -> "Original post. The capture goes with it as the image."
+            RepostMode.QUOTE -> "Your line sits above the quoted post."
+        },
+        style = MaterialTheme.typography.labelSmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(top = 6.dp),
+    )
+}
+
+@Composable
+private fun CapturedRow(capturePath: String?, onView: (String) -> Unit) {
     val preview = rememberDecoded(capturePath, MAX_PREVIEW_PIXELS)
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
             .fillMaxWidth()
-            .padding(top = 6.dp, bottom = 12.dp)
+            .padding(top = 12.dp, bottom = 14.dp)
             .clip(RoundedCornerShape(12.dp))
             .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f))
             .padding(8.dp),
     ) {
         if (preview != null && capturePath != null) {
-            androidx.compose.foundation.Image(
+            Image(
                 bitmap = preview.asImageBitmap(),
                 contentDescription = "View capture",
                 contentScale = ContentScale.Crop,
@@ -176,12 +243,12 @@ private fun CapturedPostRow(capturePath: String?, onView: (String) -> Unit) {
         }
         Column(modifier = Modifier.padding(start = if (preview != null) 10.dp else 2.dp)) {
             Text(
-                text = "Captioning this post",
+                text = "Your capture",
                 style = MaterialTheme.typography.labelLarge,
                 fontWeight = FontWeight.SemiBold,
             )
             Text(
-                text = if (capturePath != null) "tap the image to check it" else "capture attached",
+                text = if (capturePath != null) "tap to check it" else "attached",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -191,40 +258,45 @@ private fun CapturedPostRow(capturePath: String?, onView: (String) -> Unit) {
 
 @Composable
 private fun Composer(
-    steer: String,
+    mode: RepostMode,
+    userText: String,
     enabled: Boolean,
-    onSteerChange: (String) -> Unit,
+    onUserTextChange: (String) -> Unit,
     onFocusChanged: (Boolean) -> Unit,
-    onSuggest: () -> Unit,
+    onGenerate: () -> Unit,
 ) {
     val focusRequester = remember { FocusRequester() }
-
-    // Open with the keyboard already up: typing a steer is the primary action.
     LaunchedEffect(Unit) { runCatching { focusRequester.requestFocus() } }
 
     Column {
         Text(
-            text = "Add a steer (optional)",
+            text = "Your thought, or an instruction",
             style = MaterialTheme.typography.labelLarge,
             fontWeight = FontWeight.SemiBold,
         )
         Text(
-            text = "Leave it empty to just get suggestions.",
+            text = "Optional. A half-formed take gets built on; a directive gets followed.",
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(top = 2.dp, bottom = 8.dp),
         )
 
         OutlinedTextField(
-            value = steer,
-            onValueChange = onSteerChange,
+            value = userText,
+            onValueChange = onUserTextChange,
             enabled = enabled,
             placeholder = {
-                Text("e.g. tie it to exchange infra", style = MaterialTheme.typography.bodyMedium)
+                Text(
+                    text = when (mode) {
+                        RepostMode.POST -> "e.g. this is actually good for serious players"
+                        RepostMode.QUOTE -> "e.g. angle on the compliance part"
+                    },
+                    style = MaterialTheme.typography.bodyMedium,
+                )
             },
             textStyle = MaterialTheme.typography.bodyMedium,
             shape = RoundedCornerShape(18.dp),
-            maxLines = 4,
+            maxLines = 5,
             colors = OutlinedTextFieldDefaults.colors(
                 unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
             ),
@@ -240,7 +312,7 @@ private fun Composer(
                 .horizontalScroll(rememberScrollState()),
             horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            REPOST_STEERS.forEach { option ->
+            steersFor(mode).forEach { option ->
                 Text(
                     text = option,
                     style = MaterialTheme.typography.labelMedium,
@@ -249,7 +321,9 @@ private fun Composer(
                         .clip(RoundedCornerShape(16.dp))
                         .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.10f))
                         .clickable(enabled = enabled) {
-                            onSteerChange(if (steer.isBlank()) option else "$steer, $option")
+                            onUserTextChange(
+                                if (userText.isBlank()) option else "$userText, $option",
+                            )
                         }
                         .padding(horizontal = 12.dp, vertical = 7.dp),
                 )
@@ -262,11 +336,14 @@ private fun Composer(
             modifier = Modifier
                 .padding(top = 12.dp)
                 .fillMaxWidth()
-                .clickable(enabled = enabled, onClick = onSuggest),
+                .clickable(enabled = enabled, onClick = onGenerate),
         ) {
             Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(vertical = 12.dp)) {
                 Text(
-                    text = "Suggest captions",
+                    text = when (mode) {
+                        RepostMode.POST -> "Draft 6 posts"
+                        RepostMode.QUOTE -> "Draft 6 quote posts"
+                    },
                     color = Color.White,
                     style = MaterialTheme.typography.labelLarge,
                     fontWeight = FontWeight.SemiBold,
@@ -277,17 +354,20 @@ private fun Composer(
 }
 
 @Composable
-private fun SuggestingRow() {
+private fun GeneratingRow(mode: RepostMode) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 22.dp),
+            .padding(vertical = 24.dp),
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically,
     ) {
         CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
         Text(
-            text = "Writing captions…",
+            text = when (mode) {
+                RepostMode.POST -> "Writing posts…"
+                RepostMode.QUOTE -> "Writing quote posts…"
+            },
             style = MaterialTheme.typography.bodyMedium,
             modifier = Modifier.padding(start = 10.dp),
         )
@@ -295,7 +375,7 @@ private fun SuggestingRow() {
 }
 
 @Composable
-private fun Captions(captions: List<CaptionSuggestion>, onCopyText: (String) -> Unit) {
+private fun Results(result: RepostResult, onCopyText: (String) -> Unit) {
     var selectingId by remember { mutableIntStateOf(-1) }
     var copiedId by remember { mutableIntStateOf(-1) }
 
@@ -306,14 +386,17 @@ private fun Captions(captions: List<CaptionSuggestion>, onCopyText: (String) -> 
         }
     }
 
-    Column(modifier = Modifier.padding(top = 14.dp)) {
+    Column(modifier = Modifier.padding(top = 16.dp)) {
         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+
+        CaptureSummary(result)
+
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.padding(top = 12.dp, bottom = 6.dp),
+            modifier = Modifier.padding(top = 10.dp, bottom = 4.dp),
         ) {
             Text(
-                text = "Captions",
+                text = "Drafts",
                 style = MaterialTheme.typography.labelLarge,
                 fontWeight = FontWeight.SemiBold,
                 modifier = Modifier.weight(1f),
@@ -325,17 +408,67 @@ private fun Captions(captions: List<CaptionSuggestion>, onCopyText: (String) -> 
             )
         }
 
-        captions.forEach { caption ->
-            CaptionCard(
-                caption = caption,
-                selecting = selectingId == caption.id,
-                copied = copiedId == caption.id,
+        result.drafts.forEach { draft ->
+            PostDraftCard(
+                draft = draft,
+                selecting = selectingId == draft.id,
+                copied = copiedId == draft.id,
                 onCopy = {
-                    onCopyText(caption.text)
-                    copiedId = caption.id
+                    onCopyText(draft.text)
+                    copiedId = draft.id
                     selectingId = -1
                 },
-                onLongPress = { selectingId = caption.id },
+                onLongPress = { selectingId = draft.id },
+            )
+        }
+    }
+}
+
+/** What the model read off the capture, plus how it took your text. */
+@Composable
+private fun CaptureSummary(result: RepostResult) {
+    Column(modifier = Modifier.padding(top = 12.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text = result.capture.contentLabel,
+                fontSize = 9.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                    .padding(horizontal = 5.dp, vertical = 2.dp),
+            )
+            if (result.reading != TextReading.NONE) {
+                Text(
+                    text = result.reading.label,
+                    fontSize = 9.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier
+                        .padding(start = 5.dp)
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f))
+                        .padding(horizontal = 5.dp, vertical = 2.dp),
+                )
+            }
+        }
+        if (result.capture.summary.isNotEmpty()) {
+            Text(
+                text = result.capture.summary,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(top = 4.dp),
+            )
+        }
+        result.capture.quotedAuthor?.let { author ->
+            Text(
+                text = "quoting $author",
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.padding(top = 4.dp),
             )
         }
     }
@@ -343,8 +476,8 @@ private fun Captions(captions: List<CaptionSuggestion>, onCopyText: (String) -> 
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun CaptionCard(
-    caption: CaptionSuggestion,
+private fun PostDraftCard(
+    draft: PostDraft,
     selecting: Boolean,
     copied: Boolean,
     onCopy: () -> Unit,
@@ -352,7 +485,7 @@ private fun CaptionCard(
 ) {
     val haptics = LocalHapticFeedback.current
 
-    Column(modifier = Modifier.padding(vertical = 4.dp)) {
+    Column(modifier = Modifier.padding(vertical = 5.dp)) {
         Surface(
             shape = RoundedCornerShape(14.dp),
             color = if (selecting) {
@@ -369,15 +502,36 @@ private fun CaptionCard(
         ) {
             val body = @Composable {
                 Column(modifier = Modifier.padding(12.dp)) {
-                    if (caption.note.isNotEmpty()) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
-                            text = caption.note,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(bottom = 5.dp),
+                            text = draft.style.label,
+                            color = Color.White,
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(4.dp))
+                                .background(draft.style.color)
+                                .padding(horizontal = 6.dp, vertical = 2.dp),
                         )
+                        if (draft.thought.isNotEmpty()) {
+                            Text(
+                                text = draft.thought,
+                                style = MaterialTheme.typography.labelSmall,
+                                fontStyle = FontStyle.Italic,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier
+                                    .padding(start = 7.dp)
+                                    .weight(1f, fill = false),
+                            )
+                        }
                     }
-                    Text(text = caption.text, style = MaterialTheme.typography.bodyMedium)
+                    Text(
+                        text = draft.text,
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.padding(top = 8.dp),
+                    )
                 }
             }
 

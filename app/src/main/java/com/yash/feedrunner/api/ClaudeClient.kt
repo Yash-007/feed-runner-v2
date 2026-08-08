@@ -21,8 +21,20 @@ import com.yash.feedrunner.ui.Angle
 import com.yash.feedrunner.ui.ChatMessage
 import com.yash.feedrunner.ui.ChatRole
 import com.yash.feedrunner.ui.Draft
+import com.yash.feedrunner.ui.CaptureContext
 import com.yash.feedrunner.ui.PostContext
+import com.yash.feedrunner.ui.PostDraft
+import com.yash.feedrunner.ui.PostStyle
+import com.yash.feedrunner.ui.RepostMode
+import com.yash.feedrunner.ui.TextReading
 import com.yash.feedrunner.ui.Refinement
+
+/** Everything one post/quote generation returns. */
+data class RepostAnalysis(
+    val capture: CaptureContext,
+    val reading: TextReading,
+    val drafts: List<PostDraft>,
+)
 
 /** Everything one analysis returns. */
 data class Analysis(
@@ -149,6 +161,221 @@ class ClaudeClient(apiKey: String) {
 
         if (text.isNullOrBlank()) throw ClaudeException("Empty rewrite. Try again.")
         return scrubTells(text)
+    }
+
+    /**
+     * Drafts an original post about the capture, or a quote post on top of it.
+     *
+     * [userText] is passed through as-is: the prompt decides whether it reads as a
+     * seed to build on or an instruction to follow, and reports which back so the
+     * UI can show how it was taken.
+     */
+    fun suggestPosts(
+        mode: RepostMode,
+        imageSegments: List<String>,
+        userText: String,
+        extraVoiceRules: String,
+    ): RepostAnalysis {
+        val instruction = buildString {
+            append("Mode: ").append(mode.wire).append('\n')
+            if (userText.isBlank()) {
+                append("No text from Yash. Work from the image alone.")
+            } else {
+                append("Text from Yash (decide yourself whether this is a seed or an ")
+                append("instruction):\n").append(userText)
+            }
+            append("\n\nThe attached images are one screen capture, in order top to ")
+            append("bottom; consecutive slices may overlap slightly. Ignore the ")
+            append("surrounding app chrome and the status bar.")
+        }
+
+        val content = buildList {
+            imageSegments.forEach { base64 ->
+                add(
+                    ContentBlockParam.ofImage(
+                        ImageBlockParam.builder()
+                            .source(
+                                Base64ImageSource.builder()
+                                    .mediaType(Base64ImageSource.MediaType.IMAGE_JPEG)
+                                    .data(base64)
+                                    .build(),
+                            )
+                            .build(),
+                    ),
+                )
+            }
+            add(ContentBlockParam.ofText(TextBlockParam.builder().text(instruction).build()))
+        }
+
+        val params = MessageCreateParams.builder()
+            .model(MODEL)
+            .maxTokens(MAX_TOKENS)
+            .thinking(ThinkingConfigDisabled.builder().build())
+            .systemOfTextBlockParams(repostSystemBlocks(extraVoiceRules))
+            .addTool(postsTool())
+            .toolChoice(
+                ToolChoice.ofTool(ToolChoiceTool.builder().name(POSTS_TOOL_NAME).build()),
+            )
+            .addUserMessageOfBlockParams(content)
+            .build()
+
+        val response = client.messages().create(params)
+        logUsage("posts", response)
+        requireNotRefused(response.stopReason().map { it.toString() }.orElse(""))
+
+        val toolInput = response.content()
+            .firstNotNullOfOrNull { block -> block.toolUse().orElse(null) }
+            ?._input()
+            ?: throw ClaudeException("Claude returned no drafts. Try again.")
+
+        @Suppress("UNCHECKED_CAST")
+        val fields = runCatching { toolInput.convert(Map::class.java) as Map<String, Any?> }
+            .getOrNull()
+            ?: throw ClaudeException("Could not read Claude's reply. Try again.")
+
+        return parseRepost(fields)
+    }
+
+    private fun parseRepost(fields: Map<String, Any?>): RepostAnalysis {
+        val ctx = fields["capture_context"] as? Map<*, *>
+        val capture = CaptureContext(
+            contentType = (ctx?.get("content_type") as? String).orEmpty(),
+            summary = (ctx?.get("summary") as? String)?.trim().orEmpty(),
+            quotedAuthor = (ctx?.get("quoted_author") as? String)?.trim()?.takeIf { it.isNotEmpty() },
+            quotedText = (ctx?.get("quoted_text") as? String)?.trim()?.takeIf { it.isNotEmpty() },
+        )
+
+        val readingWire = (fields["user_text_read_as"] as? String).orEmpty()
+        val reading = TextReading.entries.firstOrNull { it.wire == readingWire } ?: TextReading.NONE
+
+        val raw = fields["drafts"] as? List<*> ?: emptyList<Any?>()
+        val drafts = raw.mapIndexedNotNull { index, item ->
+            val draft = item as? Map<*, *> ?: return@mapIndexedNotNull null
+            val style = (draft["style"] as? String)
+                ?.let { name -> runCatching { PostStyle.valueOf(name.trim()) }.getOrNull() }
+                ?: return@mapIndexedNotNull null
+            val text = (draft["text"] as? String)?.trim()?.takeIf { it.isNotEmpty() }
+                ?: return@mapIndexedNotNull null
+            PostDraft(
+                id = index,
+                style = style,
+                thought = (draft["thought"] as? String)?.trim().orEmpty(),
+                text = scrubTells(text),
+            )
+        }
+        if (drafts.isEmpty()) throw ClaudeException("Claude returned no drafts. Try again.")
+
+        return RepostAnalysis(capture = capture, reading = reading, drafts = drafts)
+    }
+
+    private fun repostSystemBlocks(extraVoiceRules: String): List<TextBlockParam> = buildList {
+        add(
+            TextBlockParam.builder()
+                .text(REPOST_SYSTEM_PROMPT)
+                .cacheControl(
+                    CacheControlEphemeral.builder()
+                        .ttl(CacheControlEphemeral.Ttl.TTL_1H)
+                        .build(),
+                )
+                .build(),
+        )
+        extraVoiceRules.trim().takeIf { it.isNotEmpty() }?.let { extra ->
+            add(
+                TextBlockParam.builder()
+                    .text("## ADDITIONAL RULES FROM YASH (these override the above)\n\n$extra")
+                    .build(),
+            )
+        }
+    }
+
+    private fun postsTool(): Tool {
+        val captureSchema = JsonValue.from(
+            mapOf(
+                "type" to "object",
+                "properties" to mapOf(
+                    "content_type" to mapOf(
+                        "type" to "string",
+                        "enum" to listOf(
+                            "x_post", "meme", "news", "chart", "article",
+                            "own_work", "photo", "other",
+                        ),
+                    ),
+                    "summary" to mapOf(
+                        "type" to "string",
+                        "description" to "One line: what the image shows.",
+                    ),
+                    "quoted_author" to mapOf(
+                        "type" to "string",
+                        "description" to "Quote mode only: the @handle being quoted. Empty otherwise.",
+                    ),
+                    "quoted_text" to mapOf(
+                        "type" to "string",
+                        "description" to "Quote mode only: verbatim text of the quoted post. Empty otherwise.",
+                    ),
+                ),
+                "required" to listOf("content_type", "summary"),
+            ),
+        )
+
+        val draftSchema = JsonValue.from(
+            mapOf(
+                "type" to "object",
+                "properties" to mapOf(
+                    "style" to mapOf(
+                        "type" to "string",
+                        "enum" to PostStyle.entries.map { it.name },
+                    ),
+                    "thought" to mapOf(
+                        "type" to "string",
+                        "description" to "Summary of the idea, MAX 8 WORDS. Not the post itself.",
+                    ),
+                    "text" to mapOf(
+                        "type" to "string",
+                        "description" to "The post or quote text, ready to paste.",
+                    ),
+                ),
+                "required" to listOf("style", "thought", "text"),
+            ),
+        )
+
+        return Tool.builder()
+            .name(POSTS_TOOL_NAME)
+            .description("Return what the capture shows and exactly six post drafts.")
+            .inputSchema(
+                Tool.InputSchema.builder()
+                    .properties(
+                        Tool.InputSchema.Properties.builder()
+                            .putAdditionalProperty("capture_context", captureSchema)
+                            .putAdditionalProperty(
+                                "user_text_read_as",
+                                JsonValue.from(
+                                    mapOf(
+                                        "type" to "string",
+                                        "enum" to listOf("seed", "instruction", "none"),
+                                        "description" to "How the text from Yash was interpreted.",
+                                    ),
+                                ),
+                            )
+                            .putAdditionalProperty(
+                                "drafts",
+                                JsonValue.from(
+                                    mapOf(
+                                        "type" to "array",
+                                        "description" to "Exactly six drafts, strongest first. At " +
+                                            "least 2 must be funny, and at least 1 must be " +
+                                            "Hinglish for desi-context content.",
+                                        "minItems" to 6,
+                                        "maxItems" to 6,
+                                        "items" to draftSchema,
+                                    ),
+                                ),
+                            )
+                            .build(),
+                    )
+                    .required(listOf("capture_context", "user_text_read_as", "drafts"))
+                    .build(),
+            )
+            .build()
     }
 
     /**
@@ -440,6 +667,7 @@ class ClaudeClient(apiKey: String) {
         const val REFINE_MAX_TOKENS = 1024L
         const val CHAT_MAX_TOKENS = 1500L
         const val TOOL_NAME = "deliver_drafts"
+        const val POSTS_TOOL_NAME = "deliver_post_drafts"
 
         const val ANALYZE_INSTRUCTION =
             "This is a screenshot of one X post, and possibly some of its visible replies. " +

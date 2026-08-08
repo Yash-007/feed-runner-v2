@@ -153,7 +153,7 @@ class BubbleService : Service() {
         autoCapture?.stop()
         analysisManager.shutdown()
         menuController.dismiss()
-        repostController.dismiss()
+        repostController.shutdown()
         panelController.shutdown()
         bubbleView?.let { runCatching { windowManager.removeView(it) } }
         bubbleView = null
@@ -276,8 +276,16 @@ class BubbleService : Service() {
         }
     }
 
-    /** Captures the screen and opens the repost composer on it. */
+    /**
+     * Opens the compose sheet. If a generation finished while the sheet was
+     * closed, that result is shown instead of taking a new capture, so the work
+     * is never stranded.
+     */
     private fun startRepostCapture() {
+        if (repostController.hasHeldResult) {
+            repostController.showHeldResult()
+            return
+        }
         takeScreenshotThen { bitmap -> repostController.start(bitmap) }
     }
 
