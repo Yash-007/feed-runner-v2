@@ -4,6 +4,14 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
 }
 
+import java.util.Properties
+
+// API key lives in local.properties (gitignored), never in source control.
+val localProperties = Properties().apply {
+    val file = rootProject.file("local.properties")
+    if (file.exists()) file.inputStream().use { load(it) }
+}
+
 android {
     namespace = "com.yash.feedrunner"
     compileSdk = 35
@@ -14,6 +22,12 @@ android {
         targetSdk = 35
         versionCode = 1
         versionName = "0.1"
+
+        buildConfigField(
+            "String",
+            "ANTHROPIC_API_KEY",
+            "\"${localProperties.getProperty("anthropic.apiKey", "")}\"",
+        )
     }
 
     buildTypes {
@@ -31,6 +45,18 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
+    }
+
+    packaging {
+        resources {
+            excludes += setOf(
+                "META-INF/DEPENDENCIES",
+                "META-INF/LICENSE*",
+                "META-INF/NOTICE*",
+                "META-INF/*.kotlin_module",
+            )
+        }
     }
 }
 
@@ -49,4 +75,6 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.7")
     implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.8.7")
     implementation("androidx.savedstate:savedstate-ktx:1.2.1")
+
+    implementation("com.anthropic:anthropic-java:2.34.0")
 }
