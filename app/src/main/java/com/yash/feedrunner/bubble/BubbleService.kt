@@ -28,6 +28,7 @@ import com.yash.feedrunner.data.ResultStore
 import com.yash.feedrunner.ui.MenuAnchor
 import com.yash.feedrunner.ui.MenuController
 import com.yash.feedrunner.ui.PanelController
+import com.yash.feedrunner.ui.RepostController
 import com.yash.feedrunner.work.AnalysisManager
 import kotlin.math.abs
 
@@ -69,6 +70,7 @@ class BubbleService : Service() {
     private lateinit var readState: ReadState
     private lateinit var analysisManager: AnalysisManager
     private lateinit var panelController: PanelController
+    private lateinit var repostController: RepostController
     private lateinit var menuController: MenuController
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -95,12 +97,16 @@ class BubbleService : Service() {
             refreshBubbleBadge()
         }
         analysisManager.onUpdate = ::onAnalysisUpdate
+        repostController = RepostController(this, windowManager) { visible ->
+            bubbleView?.visibility = if (visible) View.GONE else View.VISIBLE
+        }
         menuController = MenuController(
             context = this,
             windowManager = windowManager,
             resultStore = resultStore,
             onCapture = ::startSingleCapture,
             onHold = ::startAutoCapture,
+            onRepost = ::startRepostCapture,
             onLastResult = { panelController.showLastResult() },
         )
         startForeground(NOTIFICATION_ID, buildNotification())
@@ -147,6 +153,7 @@ class BubbleService : Service() {
         autoCapture?.stop()
         analysisManager.shutdown()
         menuController.dismiss()
+        repostController.dismiss()
         panelController.shutdown()
         bubbleView?.let { runCatching { windowManager.removeView(it) } }
         bubbleView = null
@@ -267,6 +274,11 @@ class BubbleService : Service() {
             // PanelController owns the bitmap from here (thumbnail, then recycle).
             panelController.analyze(bitmap)
         }
+    }
+
+    /** Captures the screen and opens the repost composer on it. */
+    private fun startRepostCapture() {
+        takeScreenshotThen { bitmap -> repostController.start(bitmap) }
     }
 
     private fun startAutoCapture() {

@@ -45,12 +45,13 @@ import androidx.compose.ui.unit.sp
 private val MenuWidth = 168.dp
 private val PillHeight = 44.dp
 private val PillGap = 7.dp
-private val MenuHeight = PillHeight * 3 + PillGap * 2
+private val MenuHeight = PillHeight * 4 + PillGap * 3
 private val EdgeGap = 8.dp
 private val IconSize = 28.dp
 
 private val CaptureColor = Color(0xFF1D9BF0)
 private val HoldColor = Color(0xFF7856FF)
+private val RepostColor = Color(0xFF00B8D9)
 private val LastColor = Color(0xFF00BA7C)
 
 data class MenuAnchor(
@@ -68,6 +69,7 @@ fun ActionMenu(
     lastResultAge: String?,
     onCapture: () -> Unit,
     onHold: () -> Unit,
+    onRepost: () -> Unit,
     onLastResult: () -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -123,6 +125,16 @@ fun ActionMenu(
             ActionPill(
                 visible = visible,
                 index = 2,
+                fromRight = anchor.dockedRight,
+                glyph = "⇄",
+                accent = RepostColor,
+                title = "Repost",
+                subtitle = "Caption this post",
+                onClick = onRepost,
+            )
+            ActionPill(
+                visible = visible,
+                index = 3,
                 fromRight = anchor.dockedRight,
                 glyph = "↺",
                 accent = LastColor,

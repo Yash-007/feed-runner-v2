@@ -12,6 +12,7 @@ class MenuController(
     private val resultStore: ResultStore,
     private val onCapture: () -> Unit,
     private val onHold: () -> Unit,
+    private val onRepost: () -> Unit,
     private val onLastResult: () -> Unit,
 ) {
     private val window = OverlayWindow(context, windowManager)
@@ -31,6 +32,7 @@ class MenuController(
                     lastResultAge = lastAge,
                     onCapture = { dismiss(); onCapture() },
                     onHold = { dismiss(); onHold() },
+                    onRepost = { dismiss(); onRepost() },
                     onLastResult = { dismiss(); onLastResult() },
                     onDismiss = ::dismiss,
                 )
