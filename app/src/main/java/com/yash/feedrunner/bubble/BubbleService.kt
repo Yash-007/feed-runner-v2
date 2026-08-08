@@ -9,7 +9,6 @@ import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.PixelFormat
-import android.os.Environment
 import android.os.IBinder
 import android.provider.Settings
 import android.util.TypedValue
@@ -28,10 +27,7 @@ import com.yash.feedrunner.data.ResultStore
 import com.yash.feedrunner.ui.MenuAnchor
 import com.yash.feedrunner.ui.MenuController
 import com.yash.feedrunner.ui.PanelController
-import java.io.File
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
+import com.yash.feedrunner.work.AnalysisManager
 import kotlin.math.abs
 
 /**
@@ -59,7 +55,14 @@ class BubbleService : Service() {
     /** Non-null while an auto-scroll capture ("Hold") is running. */
     private var autoCapture: AutoScrollCapture? = null
 
+    /** Frames captured so far by an active Hold, or null when not capturing. */
+    private var holdFrames: Int? = null
+
+    /** Analyses currently in flight, shown on the bubble. */
+    private var pendingAnalyses = 0
+
     private lateinit var resultStore: ResultStore
+    private lateinit var analysisManager: AnalysisManager
     private lateinit var panelController: PanelController
     private lateinit var menuController: MenuController
 
@@ -69,10 +72,22 @@ class BubbleService : Service() {
         super.onCreate()
         windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
         resultStore = ResultStore(this)
-        panelController = PanelController(this, windowManager, resultStore) { panelVisible ->
+        analysisManager = AnalysisManager(this, resultStore)
+        panelController = PanelController(
+            this,
+            windowManager,
+            resultStore,
+            analysisManager,
+        ) { panelVisible ->
             // Hide the bubble while the panel is up so it doesn't sit on the scrim.
             bubbleView?.visibility = if (panelVisible) View.GONE else View.VISIBLE
         }
+
+        analysisManager.onActiveCountChanged = { count ->
+            pendingAnalyses = count
+            refreshBubbleBadge()
+        }
+        analysisManager.onUpdate = ::onAnalysisUpdate
         menuController = MenuController(
             context = this,
             windowManager = windowManager,
@@ -93,10 +108,34 @@ class BubbleService : Service() {
         return START_STICKY
     }
 
+    /**
+     * A finished job goes to the panel if it is still watching that job, and to
+     * a toast otherwise, so a result generated while scrolling is never silent.
+     */
+    private fun onAnalysisUpdate(update: AnalysisManager.Update) {
+        when (update) {
+            is AnalysisManager.Update.Done ->
+                if (panelController.isWatching(update.jobId)) {
+                    panelController.showFinished(update.resultId)
+                } else {
+                    val who = update.author.takeIf { it.isNotBlank() } ?: "that post"
+                    Toast.makeText(this, "Drafts ready for $who", Toast.LENGTH_SHORT).show()
+                }
+
+            is AnalysisManager.Update.Failed ->
+                if (panelController.isWatching(update.jobId)) {
+                    panelController.showFailure(update.message)
+                } else {
+                    Toast.makeText(this, update.message, Toast.LENGTH_LONG).show()
+                }
+        }
+    }
+
     override fun onDestroy() {
         autoCapture?.stop()
+        analysisManager.shutdown()
         menuController.dismiss()
-        panelController.dismiss()
+        panelController.shutdown()
         bubbleView?.let { runCatching { windowManager.removeView(it) } }
         bubbleView = null
         bubbleParams = null
@@ -196,7 +235,6 @@ class BubbleService : Service() {
 
     private fun startSingleCapture() {
         takeScreenshotThen { bitmap ->
-            saveCapture(bitmap)
             // PanelController owns the bitmap from here (thumbnail, then recycle).
             panelController.analyze(bitmap)
         }
@@ -209,7 +247,6 @@ class BubbleService : Service() {
             return
         }
 
-        Toast.makeText(this, "Scrolling & capturing… tap bubble to stop", Toast.LENGTH_SHORT).show()
         autoCapture = AutoScrollCapture(
             service = captureService,
             statusBarPx = statusBarHeightPx(),
@@ -219,14 +256,17 @@ class BubbleService : Service() {
                 bubbleView?.postDelayed(onHidden, 150) ?: onHidden()
             },
             showBubble = { bubbleView?.visibility = View.VISIBLE },
-            onProgress = { frames -> updateBubbleBadge(frames) },
+            onProgress = { frames ->
+                holdFrames = frames
+                refreshBubbleBadge()
+            },
             onFinished = { stitched, frames ->
                 autoCapture = null
-                updateBubbleBadge(null)
+                holdFrames = null
+                refreshBubbleBadge()
                 if (stitched == null) {
                     Toast.makeText(this, "Capture failed", Toast.LENGTH_SHORT).show()
                 } else {
-                    saveCapture(stitched)
                     // Milestone 3: slice the stitched image into readable segments
                     // before sending — very tall images get downscaled by the API.
                     panelController.analyze(stitched)
@@ -275,32 +315,37 @@ class BubbleService : Service() {
         }, 150)
     }
 
-    /** Spark icon when idle; warm gradient with a frame count while capturing. */
-    private fun updateBubbleBadge(frameCount: Int?) {
+    /**
+     * Spark icon when idle, a coral count while a Hold is capturing, and an amber
+     * count while analyses run in the background. Capturing wins when both are
+     * true, because that one is about to end.
+     */
+    private fun refreshBubbleBadge() {
         val circle = bubbleCircle ?: return
-        if (frameCount == null) {
+        val frames = holdFrames
+        val badge = frames ?: pendingAnalyses.takeIf { it > 0 }
+
+        if (badge == null) {
             circle.setBackgroundResource(com.yash.feedrunner.R.drawable.bubble_bg)
             bubbleIcon?.visibility = View.VISIBLE
             bubbleCount?.visibility = View.GONE
-        } else {
-            circle.setBackgroundResource(com.yash.feedrunner.R.drawable.bubble_bg_recording)
-            bubbleIcon?.visibility = View.GONE
-            bubbleCount?.apply {
-                text = frameCount.toString()
-                visibility = View.VISIBLE
-            }
+            return
+        }
+
+        circle.setBackgroundResource(
+            if (frames != null) {
+                com.yash.feedrunner.R.drawable.bubble_bg_recording
+            } else {
+                com.yash.feedrunner.R.drawable.bubble_bg_working
+            },
+        )
+        bubbleIcon?.visibility = View.GONE
+        bubbleCount?.apply {
+            text = badge.toString()
+            visibility = View.VISIBLE
         }
     }
 
-    private fun saveCapture(bitmap: Bitmap): File {
-        val dir = getExternalFilesDir(Environment.DIRECTORY_PICTURES)!!
-        val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
-        val file = File(dir, "capture_$timestamp.jpg")
-        file.outputStream().use { out ->
-            bitmap.compress(Bitmap.CompressFormat.JPEG, 85, out)
-        }
-        return file
-    }
 
 
     /**
