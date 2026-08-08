@@ -19,7 +19,11 @@ class MenuController(
     val isShowing: Boolean get() = window.isShowing
 
     fun show(anchor: MenuAnchor) {
-        val lastAge = resultStore.load()?.let { relativeAge(it.savedAtMillis) }
+        val saved = resultStore.loadAll()
+        val lastAge = saved.firstOrNull()?.let { newest ->
+            val age = relativeAge(newest.savedAtMillis)
+            if (saved.size > 1) "$age · ${saved.size} saved" else age
+        }
         window.show {
             MaterialTheme {
                 ActionMenu(
