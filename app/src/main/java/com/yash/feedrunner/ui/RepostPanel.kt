@@ -121,69 +121,70 @@ fun RepostPanel(
                 .clickable(enabled = false) {},
         ) {
             Box {
-            Column(
-                modifier = Modifier
-                    .verticalScroll(scrollState)
-                    .padding(16.dp),
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
+                Column(
+                    modifier = Modifier
+                        .verticalScroll(scrollState)
+                        .padding(16.dp),
                 ) {
-                    Text(
-                        text = "Compose",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.weight(1f),
-                    )
-                    TextButton(onClick = onDismiss) { Text("Close") }
-                }
-
-                ModeToggle(
-                    mode = mode,
-                    enabled = state !is RepostState.Loading,
-                    onModeChange = onModeChange,
-                )
-
-                CapturedRow(capturePath = capturePath, onView = { viewerPath = it })
-
-                Composer(
-                    mode = mode,
-                    userText = userText,
-                    enabled = state !is RepostState.Loading,
-                    onUserTextChange = onUserTextChange,
-                    onFocusChanged = onFocusChanged,
-                    onGenerate = onGenerate,
-                )
-
-                when (state) {
-                    is RepostState.Composing -> Unit
-                    is RepostState.Loading -> GeneratingRow(mode)
-                    is RepostState.Error -> Text(
-                        text = state.message,
-                        style = MaterialTheme.typography.bodyMedium,
-                        modifier = Modifier.padding(top = 16.dp),
-                    )
-                    is RepostState.Ready -> {
-                        Results(result = state.result, onCopyText = onCopyText)
-                        ChatThread(
-                            chat = state.result.chat,
-                            pending = state.chatPending,
-                            quickPrompts = POST_QUICK_PROMPTS,
-                            title = "Ask for a different ${state.result.mode.label.lowercase()}",
-                            onCopyText = onCopyText,
-                            onSend = onSendChat,
-                            onFocusChanged = onFocusChanged,
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            text = "Compose",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.weight(1f),
                         )
+                        TextButton(onClick = onDismiss) { Text("Close") }
+                    }
+
+                    ModeToggle(
+                        mode = mode,
+                        enabled = state !is RepostState.Loading,
+                        onModeChange = onModeChange,
+                    )
+
+                    CapturedRow(capturePath = capturePath, onView = { viewerPath = it })
+
+                    Composer(
+                        mode = mode,
+                        userText = userText,
+                        enabled = state !is RepostState.Loading,
+                        autoFocus = state is RepostState.Composing,
+                        onUserTextChange = onUserTextChange,
+                        onFocusChanged = onFocusChanged,
+                        onGenerate = onGenerate,
+                    )
+
+                    when (state) {
+                        is RepostState.Composing -> Unit
+                        is RepostState.Loading -> GeneratingRow(mode)
+                        is RepostState.Error -> Text(
+                            text = state.message,
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier.padding(top = 16.dp),
+                        )
+                        is RepostState.Ready -> {
+                            Results(result = state.result, onCopyText = onCopyText)
+                            ChatThread(
+                                chat = state.result.chat,
+                                pending = state.chatPending,
+                                quickPrompts = POST_QUICK_PROMPTS,
+                                title = "Ask for a different ${state.result.mode.label.lowercase()}",
+                                onCopyText = onCopyText,
+                                onSend = onSendChat,
+                                onFocusChanged = onFocusChanged,
+                            )
+                        }
                     }
                 }
-            }
 
-            JumpToBottom(
-                visible = scrollState.value < scrollState.maxValue - JUMP_VISIBLE_SLOP,
-                onClick = { scope.launch { scrollState.animateScrollTo(scrollState.maxValue) } },
-                modifier = Modifier.align(Alignment.BottomEnd),
-            )
+                JumpToBottom(
+                    visible = scrollState.value < scrollState.maxValue - JUMP_VISIBLE_SLOP,
+                    onClick = { scope.launch { scrollState.animateScrollTo(scrollState.maxValue) } },
+                    modifier = Modifier.align(Alignment.BottomEnd),
+                )
             }
         }
 
@@ -289,12 +290,17 @@ private fun Composer(
     mode: RepostMode,
     userText: String,
     enabled: Boolean,
+    autoFocus: Boolean,
     onUserTextChange: (String) -> Unit,
     onFocusChanged: (Boolean) -> Unit,
     onGenerate: () -> Unit,
 ) {
     val focusRequester = remember { FocusRequester() }
-    LaunchedEffect(Unit) { runCatching { focusRequester.requestFocus() } }
+    // Only raise the keyboard for a fresh capture. Reopening finished drafts has
+    // nothing to type, and the keyboard would cover the drafts you came back for.
+    LaunchedEffect(autoFocus) {
+        if (autoFocus) runCatching { focusRequester.requestFocus() }
+    }
 
     Column {
         Text(
