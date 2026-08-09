@@ -592,6 +592,12 @@ class ClaudeClient(apiKey: String) {
         .replace(" \u2014", ",")
         .replace("\u2014", ",")
         .replace(Regex(",\\s*,"), ",")
+        // Nothing here renders markup, so line-break tags and emphasis markers
+        // would show up literally in a bubble or, worse, in a pasted post.
+        .replace(Regex("<br\\s*/?>", RegexOption.IGNORE_CASE), "\n")
+        .replace(Regex("\\*\\*(.+?)\\*\\*"), "$1")
+        .replace(Regex("(?<!\\*)\\*(?!\\s)([^*\\n]+?)\\*"), "$1")
+        .replace(Regex("\n{3,}"), "\n\n")
         .trim()
 
     private fun parseAnalysis(fields: Map<String, Any?>): Analysis {
@@ -735,7 +741,8 @@ class ClaudeClient(apiKey: String) {
          */
         const val PLAIN_TEXT_NOTE =
             "\nThis turn is plain chat, not a tool call. Do not use any tool. " +
-                "Write your answer directly as normal text."
+                "Write your answer directly as normal text: no markdown, no bold, " +
+                "no headings, no HTML tags. Use real line breaks, never <br>."
 
         const val TOOL_NAME = "deliver_drafts"
         const val POSTS_TOOL_NAME = "deliver_post_drafts"
