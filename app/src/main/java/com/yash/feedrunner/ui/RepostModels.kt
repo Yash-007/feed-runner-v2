@@ -57,6 +57,8 @@ data class RepostResult(
     val drafts: List<PostDraft>,
     val capturePath: String?,
     val savedAtMillis: Long,
+    /** Follow-up conversation about these drafts, persisted with them. */
+    val chat: List<ChatMessage> = emptyList(),
 )
 
 sealed interface RepostState {
@@ -65,7 +67,10 @@ sealed interface RepostState {
 
     data object Loading : RepostState
 
-    data class Ready(val result: RepostResult) : RepostState
+    data class Ready(
+        val result: RepostResult,
+        val chatPending: Boolean = false,
+    ) : RepostState
 
     data class Error(val message: String) : RepostState
 }

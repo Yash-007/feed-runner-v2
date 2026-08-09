@@ -67,6 +67,7 @@ data class MenuAnchor(
 fun ActionMenu(
     anchor: MenuAnchor,
     lastResultAge: String?,
+    repostDraftsAge: String?,
     onCapture: () -> Unit,
     onHold: () -> Unit,
     onRepost: () -> Unit,
@@ -129,7 +130,7 @@ fun ActionMenu(
                 glyph = "⇄",
                 accent = RepostColor,
                 title = "Repost",
-                subtitle = "Caption this post",
+                subtitle = repostDraftsAge?.let { "drafts · $it" } ?: "Caption this post",
                 onClick = onRepost,
             )
             ActionPill(

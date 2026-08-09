@@ -13,6 +13,7 @@ class MenuController(
     private val onCapture: () -> Unit,
     private val onHold: () -> Unit,
     private val onRepost: () -> Unit,
+    private val repostDraftsAge: () -> String?,
     private val onLastResult: () -> Unit,
 ) {
     private val window = OverlayWindow(context, windowManager)
@@ -30,6 +31,7 @@ class MenuController(
                 ActionMenu(
                     anchor = anchor,
                     lastResultAge = lastAge,
+                    repostDraftsAge = repostDraftsAge(),
                     onCapture = { dismiss(); onCapture() },
                     onHold = { dismiss(); onHold() },
                     onRepost = { dismiss(); onRepost() },

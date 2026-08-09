@@ -131,7 +131,8 @@ class ClaudeClient(apiKey: String) {
             append("Keep the same angle and the same core point. ")
             append("Same voice rules as always.\n\n")
             append("Output only the rewritten reply. Nothing else: no preamble, ")
-            append("no quotes, no explanation, no alternatives.")
+            append("no quotes, no explanation, no alternatives.\n")
+            append(PLAIN_TEXT_NOTE)
         }
 
         val params = MessageCreateParams.builder()
@@ -234,6 +235,105 @@ class ClaudeClient(apiKey: String) {
             ?: throw ClaudeException("Could not read Claude's reply. Try again.")
 
         return parseRepost(fields)
+    }
+
+    /**
+     * Follow-up chat about a set of post or quote drafts. Mirrors [chat]: same
+     * declared-but-forbidden tool so the [REPOST_SYSTEM_PROMPT] cache is reused,
+     * and the capture is described in words rather than re-sent as an image, which
+     * would be a fresh upload on every turn.
+     */
+    fun chatPosts(
+        mode: RepostMode,
+        capture: CaptureContext,
+        drafts: List<PostDraft>,
+        history: List<ChatMessage>,
+        userMessage: String,
+        extraVoiceRules: String,
+    ): String {
+        val opening = buildString {
+            append("Mode: ").append(mode.wire).append('\n')
+            append("The capture we are working from: ").append(capture.contentLabel)
+            append(", ").append(capture.summary).append('\n')
+            capture.quotedAuthor?.takeIf { it.isNotBlank() }?.let { author ->
+                append("Quoting ").append(author)
+                capture.quotedText?.takeIf { it.isNotBlank() }?.let { quoted ->
+                    append(": \"").append(quoted).append('"')
+                }
+                append('\n')
+            }
+            append("\nDrafts already suggested, do not repeat these:\n")
+            drafts.forEach { draft ->
+                append("- [").append(draft.style.label).append("] ").append(draft.text).append('\n')
+            }
+            append("\nI'll now ask for changes or a different angle. Same voice and ")
+            append("rules as always. When I ask for a post, give the post itself, ")
+            append("ready to paste, with no preamble and no numbered list unless I ask ")
+            append("for several. Keep any explanation to one short line.\n")
+            append(PLAIN_TEXT_NOTE)
+        }
+
+        val params = MessageCreateParams.builder()
+            .model(MODEL)
+            .maxTokens(CHAT_MAX_TOKENS)
+            .thinking(ThinkingConfigDisabled.builder().build())
+            .systemOfTextBlockParams(repostSystemBlocks(extraVoiceRules))
+            .addTool(postsTool())
+            .toolChoice(ToolChoice.ofNone(ToolChoiceNone.builder().build()))
+            .messages(chatMessages(opening, history, userMessage))
+            .build()
+
+        val response = client.messages().create(params)
+        logUsage("postsChat", response)
+        requireNotRefused(response.stopReason().map { it.toString() }.orElse(""))
+
+        val text = response.content()
+            .firstNotNullOfOrNull { block -> block.text().orElse(null) }
+            ?.text()
+            ?.trim()
+
+        if (text.isNullOrBlank()) throw ClaudeException("Empty reply. Try again.")
+        return scrubTells(text)
+    }
+
+    /**
+     * Folds [opening] into the first user turn so the context travels with the
+     * conversation instead of being re-stated, then replays the rest verbatim.
+     */
+    private fun chatMessages(
+        opening: String,
+        history: List<ChatMessage>,
+        userMessage: String,
+    ): List<MessageParam> = buildList {
+        val firstUser = history.firstOrNull { it.role == ChatRole.USER }?.text
+        add(
+            MessageParam.builder()
+                .role(MessageParam.Role.USER)
+                .content(if (firstUser != null) "$opening\n\n$firstUser" else "$opening\n\n$userMessage")
+                .build(),
+        )
+        if (firstUser == null) return@buildList
+
+        var seenFirstUser = false
+        history.forEach { message ->
+            if (!seenFirstUser && message.role == ChatRole.USER) {
+                seenFirstUser = true
+                return@forEach
+            }
+            add(
+                MessageParam.builder()
+                    .role(
+                        if (message.role == ChatRole.USER) {
+                            MessageParam.Role.USER
+                        } else {
+                            MessageParam.Role.ASSISTANT
+                        },
+                    )
+                    .content(message.text)
+                    .build(),
+            )
+        }
+        add(MessageParam.builder().role(MessageParam.Role.USER).content(userMessage).build())
     }
 
     private fun parseRepost(fields: Map<String, Any?>): RepostAnalysis {
@@ -406,48 +506,8 @@ class ClaudeClient(apiKey: String) {
             append("\nI'll now ask for changes or new angles. Answer in the same voice ")
             append("and rules as always. When I ask for a reply, give the reply itself, ")
             append("ready to paste, with no preamble and no numbered list unless I ask ")
-            append("for several. Keep any explanation to one short line.")
-        }
-
-        val messages = buildList {
-            // The first turn carries the context; the rest is the real conversation.
-            val firstUser = history.firstOrNull { it.role == ChatRole.USER }?.text
-            add(
-                MessageParam.builder()
-                    .role(MessageParam.Role.USER)
-                    .content(
-                        if (firstUser != null) "$opening\n\n$firstUser" else "$opening\n\n$userMessage",
-                    )
-                    .build(),
-            )
-
-            if (firstUser != null) {
-                var seenFirstUser = false
-                history.forEach { message ->
-                    if (!seenFirstUser && message.role == ChatRole.USER) {
-                        seenFirstUser = true
-                        return@forEach
-                    }
-                    add(
-                        MessageParam.builder()
-                            .role(
-                                if (message.role == ChatRole.USER) {
-                                    MessageParam.Role.USER
-                                } else {
-                                    MessageParam.Role.ASSISTANT
-                                },
-                            )
-                            .content(message.text)
-                            .build(),
-                    )
-                }
-                add(
-                    MessageParam.builder()
-                        .role(MessageParam.Role.USER)
-                        .content(userMessage)
-                        .build(),
-                )
-            }
+            append("for several. Keep any explanation to one short line.\n")
+            append(PLAIN_TEXT_NOTE)
         }
 
         val params = MessageCreateParams.builder()
@@ -458,7 +518,7 @@ class ClaudeClient(apiKey: String) {
             // Same reason as refine(): keeps the cached prefix identical.
             .addTool(draftsTool())
             .toolChoice(ToolChoice.ofNone(ToolChoiceNone.builder().build()))
-            .messages(messages)
+            .messages(chatMessages(opening, history, userMessage))
             .build()
 
         val response = client.messages().create(params)
@@ -666,6 +726,17 @@ class ClaudeClient(apiKey: String) {
         const val MAX_TOKENS = 4096L
         const val REFINE_MAX_TOKENS = 1024L
         const val CHAT_MAX_TOKENS = 1500L
+        /**
+         * The system prompts tell Claude to deliver everything through a tool, so
+         * on a text-answer call it reaches for the declared-but-forbidden tool and
+         * returns a response with no content blocks at all. The tool has to stay
+         * declared to keep the cached prefix identical, so the way out is to say
+         * plainly that this turn is text.
+         */
+        const val PLAIN_TEXT_NOTE =
+            "\nThis turn is plain chat, not a tool call. Do not use any tool. " +
+                "Write your answer directly as normal text."
+
         const val TOOL_NAME = "deliver_drafts"
         const val POSTS_TOOL_NAME = "deliver_post_drafts"
 

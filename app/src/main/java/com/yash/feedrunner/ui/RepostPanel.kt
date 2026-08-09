@@ -41,6 +41,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -59,6 +60,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 private val SheetShape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp)
 
@@ -80,16 +82,26 @@ fun RepostPanel(
     onUserTextChange: (String) -> Unit,
     onGenerate: () -> Unit,
     onCopyText: (String) -> Unit,
+    onSendChat: (String) -> Unit,
     onFocusChanged: (Boolean) -> Unit,
     onDismiss: () -> Unit,
 ) {
     var viewerPath by remember { mutableStateOf<String?>(null) }
     val scrollState = rememberScrollState()
+    val scope = rememberCoroutineScope()
+    val ready = state as? RepostState.Ready
 
-    // Drop to the drafts as soon as they land; the composer is above them.
-    LaunchedEffect(state) {
-        if (state is RepostState.Ready) scrollState.animateScrollTo(scrollState.maxValue)
+    // Drop to the drafts as soon as they land; the composer is above them. Keyed
+    // on the result rather than the state so a chat turn does not re-trigger it.
+    LaunchedEffect(ready?.result?.savedAtMillis) {
+        if (ready != null) scrollState.animateScrollTo(scrollState.maxValue)
     }
+
+    FollowChatGrowth(
+        scrollState = scrollState,
+        chatSize = ready?.result?.chat?.size ?: 0,
+        resetKey = ready?.result?.savedAtMillis,
+    )
 
     Box(
         modifier = Modifier
@@ -108,6 +120,7 @@ fun RepostPanel(
                 .imePadding()
                 .clickable(enabled = false) {},
         ) {
+            Box {
             Column(
                 modifier = Modifier
                     .verticalScroll(scrollState)
@@ -151,11 +164,26 @@ fun RepostPanel(
                         style = MaterialTheme.typography.bodyMedium,
                         modifier = Modifier.padding(top = 16.dp),
                     )
-                    is RepostState.Ready -> Results(
-                        result = state.result,
-                        onCopyText = onCopyText,
-                    )
+                    is RepostState.Ready -> {
+                        Results(result = state.result, onCopyText = onCopyText)
+                        ChatThread(
+                            chat = state.result.chat,
+                            pending = state.chatPending,
+                            quickPrompts = POST_QUICK_PROMPTS,
+                            title = "Ask for a different ${state.result.mode.label.lowercase()}",
+                            onCopyText = onCopyText,
+                            onSend = onSendChat,
+                            onFocusChanged = onFocusChanged,
+                        )
+                    }
                 }
+            }
+
+            JumpToBottom(
+                visible = scrollState.value < scrollState.maxValue - JUMP_VISIBLE_SLOP,
+                onClick = { scope.launch { scrollState.animateScrollTo(scrollState.maxValue) } },
+                modifier = Modifier.align(Alignment.BottomEnd),
+            )
             }
         }
 

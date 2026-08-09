@@ -107,6 +107,7 @@ class BubbleService : Service() {
             onCapture = ::startSingleCapture,
             onHold = ::startAutoCapture,
             onRepost = ::startRepostCapture,
+            repostDraftsAge = { repostController.heldResultAge },
             onLastResult = { panelController.showLastResult() },
         )
         startForeground(NOTIFICATION_ID, buildNotification())

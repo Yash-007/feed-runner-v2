@@ -18,6 +18,7 @@ import com.yash.feedrunner.BuildConfig
 import com.yash.feedrunner.api.ClaudeClient
 import com.yash.feedrunner.api.ClaudeException
 import com.yash.feedrunner.api.ImagePrep
+import com.yash.feedrunner.data.RepostStore
 import com.yash.feedrunner.data.VoiceRulesStore
 import java.io.File
 import java.util.concurrent.Executors
@@ -40,6 +41,7 @@ class RepostController(
     private val worker = Executors.newSingleThreadExecutor()
     private val window = OverlayWindow(context, windowManager)
     private val voiceRulesStore = VoiceRulesStore(context)
+    private val store = RepostStore(context)
     private val captureDir = File(context.filesDir, "repost").apply { mkdirs() }
 
     private val claude: ClaudeClient? by lazy {
@@ -51,12 +53,19 @@ class RepostController(
     private var userText by mutableStateOf("")
     private var capturePath by mutableStateOf<String?>(null)
 
-    /** Set when a generation finished while the sheet was closed. */
-    private var heldResult: RepostResult? = null
+    /**
+     * The last finished generation, whether it landed while the sheet was closed
+     * or in an earlier run of the process. Seeded from disk so a restart does not
+     * throw away drafts and the conversation about them.
+     */
+    private var heldResult: RepostResult? = store.load()
 
     val isShowing: Boolean get() = window.isShowing
 
     val hasHeldResult: Boolean get() = heldResult != null
+
+    /** How long ago the held drafts were generated, for the menu subtitle. */
+    val heldResultAge: String? get() = heldResult?.let { relativeAge(it.savedAtMillis) }
 
     /** Opens the composer for a fresh capture, with the keyboard already up. */
     fun start(screenshot: Bitmap) {
@@ -101,6 +110,7 @@ class RepostController(
                     onUserTextChange = { userText = it },
                     onGenerate = ::generate,
                     onCopyText = ::copyText,
+                    onSendChat = ::sendChat,
                     onFocusChanged = window::setFocusable,
                     onDismiss = ::dismiss,
                 )
@@ -149,12 +159,12 @@ class RepostController(
                             capturePath = path,
                             savedAtMillis = System.currentTimeMillis(),
                         )
+                        store.save(result)
+                        heldResult = result
                         if (window.isShowing) {
-                            heldResult = null
                             state = RepostState.Ready(result)
                         } else {
                             // Closed mid-flight: hold it rather than throw it away.
-                            heldResult = result
                             Toast.makeText(
                                 context,
                                 "${requestedMode.label} drafts ready, tap Repost to see them",
@@ -175,6 +185,64 @@ class RepostController(
                         } else {
                             Toast.makeText(context, message, Toast.LENGTH_LONG).show()
                         }
+                    }
+            }
+        }
+    }
+
+    /**
+     * Follow-up turn about the drafts on screen. Like [generate] this is not
+     * cancelled by dismissal, and the conversation is written through to disk on
+     * both the send and the answer so nothing is lost either way.
+     */
+    private fun sendChat(message: String) {
+        val client = claude ?: return
+        val ready = state as? RepostState.Ready ?: return
+        if (message.isBlank()) return
+
+        val result = ready.result
+        val history = result.chat
+        val withUserTurn = history + ChatMessage(ChatRole.USER, message)
+        state = RepostState.Ready(result.copy(chat = withUserTurn), chatPending = true)
+        heldResult = result.copy(chat = withUserTurn)
+        store.updateChat(result.savedAtMillis, withUserTurn)
+
+        val voiceRules = voiceRulesStore.rules
+
+        worker.execute {
+            val outcome = runCatching {
+                client.chatPosts(
+                    mode = result.mode,
+                    capture = result.capture,
+                    drafts = result.drafts,
+                    history = history,
+                    userMessage = message,
+                    extraVoiceRules = voiceRules,
+                )
+            }
+
+            handler.post {
+                outcome
+                    .onSuccess { reply ->
+                        val withReply = withUserTurn + ChatMessage(ChatRole.ASSISTANT, reply)
+                        val updated = result.copy(chat = withReply)
+                        heldResult = updated
+                        store.updateChat(result.savedAtMillis, withReply)
+                        // Only paint if this result is still the one on screen.
+                        val current = state as? RepostState.Ready
+                        if (current?.result?.savedAtMillis == result.savedAtMillis) {
+                            state = RepostState.Ready(updated, chatPending = false)
+                        }
+                    }
+                    .onFailure { error ->
+                        Log.w(TAG, "Post chat failed", error)
+                        val current = state as? RepostState.Ready
+                        if (current?.result?.savedAtMillis == result.savedAtMillis) {
+                            state = current.copy(chatPending = false)
+                        }
+                        val message = (error as? ClaudeException)?.message
+                            ?: "Chat failed. Check your connection."
+                        Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
                     }
             }
         }
