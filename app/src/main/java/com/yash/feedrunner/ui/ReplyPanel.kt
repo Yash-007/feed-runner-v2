@@ -91,6 +91,10 @@ fun ReplyPanel(
     var bodyScroll by remember { mutableStateOf<ScrollState?>(null) }
     val scope = rememberCoroutineScope()
 
+    // The jump button and the chat send button both live in the bottom-right
+    // corner, so the jump button has to get out of the way while you are typing.
+    var chatFocused by remember { mutableStateOf(false) }
+
     // Scrim: tapping outside the sheet dismisses.
     Box(
         modifier = Modifier
@@ -125,7 +129,10 @@ fun ReplyPanel(
                         onViewCapture = { viewerPath = it },
                         onSendChat = onSendChat,
                         onCopyText = onCopyText,
-                        onChatFocusChanged = onChatFocusChanged,
+                        onChatFocusChanged = { focused ->
+                            chatFocused = focused
+                            onChatFocusChanged(focused)
+                        },
                         onScrollState = { bodyScroll = it },
                     )
                 }
@@ -133,7 +140,7 @@ fun ReplyPanel(
 
               bodyScroll?.let { scroll ->
                   JumpToBottom(
-                      visible = scroll.maxValue > 0 &&
+                      visible = !chatFocused && scroll.maxValue > 0 &&
                           scroll.value < scroll.maxValue - JUMP_VISIBLE_SLOP,
                       onClick = { scope.launch { scroll.animateScrollTo(scroll.maxValue) } },
                       modifier = Modifier.align(Alignment.BottomEnd),

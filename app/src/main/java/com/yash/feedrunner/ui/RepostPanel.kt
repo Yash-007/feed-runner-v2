@@ -91,6 +91,13 @@ fun RepostPanel(
     val scope = rememberCoroutineScope()
     val ready = state as? RepostState.Ready
 
+    // Same corner as the chat send button, so it yields while you are typing.
+    var inputFocused by remember { mutableStateOf(false) }
+    val trackFocus: (Boolean) -> Unit = { focused ->
+        inputFocused = focused
+        onFocusChanged(focused)
+    }
+
     // Drop to the drafts as soon as they land; the composer is above them. Keyed
     // on the result rather than the state so a chat turn does not re-trigger it.
     LaunchedEffect(ready?.result?.savedAtMillis) {
@@ -153,7 +160,7 @@ fun RepostPanel(
                         enabled = state !is RepostState.Loading,
                         autoFocus = state is RepostState.Composing,
                         onUserTextChange = onUserTextChange,
-                        onFocusChanged = onFocusChanged,
+                        onFocusChanged = trackFocus,
                         onGenerate = onGenerate,
                     )
 
@@ -174,14 +181,15 @@ fun RepostPanel(
                                 title = "Ask for a different ${state.result.mode.label.lowercase()}",
                                 onCopyText = onCopyText,
                                 onSend = onSendChat,
-                                onFocusChanged = onFocusChanged,
+                                onFocusChanged = trackFocus,
                             )
                         }
                     }
                 }
 
                 JumpToBottom(
-                    visible = scrollState.value < scrollState.maxValue - JUMP_VISIBLE_SLOP,
+                    visible = !inputFocused &&
+                        scrollState.value < scrollState.maxValue - JUMP_VISIBLE_SLOP,
                     onClick = { scope.launch { scrollState.animateScrollTo(scrollState.maxValue) } },
                     modifier = Modifier.align(Alignment.BottomEnd),
                 )
