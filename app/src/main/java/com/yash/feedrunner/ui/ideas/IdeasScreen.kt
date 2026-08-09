@@ -1,35 +1,44 @@
 package com.yash.feedrunner.ui.ideas
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -37,38 +46,44 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.yash.feedrunner.ui.ChatThread
 import com.yash.feedrunner.ui.PostIdea
-import com.yash.feedrunner.ui.SEED_QUICK_PROMPTS
 import com.yash.feedrunner.ui.SeedStatus
-import com.yash.feedrunner.ui.StoredSeed
-import com.yash.feedrunner.ui.relativeAge
 
 /**
  * The Idea Bank.
  *
  * Seeds arrive on their own as a side effect of generating replies and posts, so
- * this screen is mostly for reading: pick the ones worth writing about, ask for
- * post ideas, and mark off what has been used.
+ * this screen is mostly for reading. The two jobs it has to make easy are finding
+ * the seed worth writing about, and turning a few of them into post ideas.
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun IdeasScreen(state: IdeasUiState, actions: IdeasActions) {
     var showManualDialog by remember { mutableStateOf(false) }
     var showAddressDialog by remember { mutableStateOf(false) }
     var steer by remember { mutableStateOf("") }
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     Column(modifier = Modifier.fillMaxSize()) {
         Header(
             pendingCount = state.pendingCount,
-            onRefresh = actions.onRefresh,
+            serverReachable = state.serverReachable,
             onEditAddress = { showAddressDialog = true },
         )
 
-        FilterRow(selected = state.filter, onSelect = actions.onFilterChange)
+        FilterBar(
+            status = state.filter,
+            tag = state.tagFilter,
+            tags = state.availableTags,
+            onStatus = actions.onFilterChange,
+            onTag = actions.onTagFilterChange,
+        )
 
         state.message?.let { message ->
             Text(
@@ -79,25 +94,36 @@ fun IdeasScreen(state: IdeasUiState, actions: IdeasActions) {
             )
         }
 
-        Box(modifier = Modifier.weight(1f)) {
-            when {
-                state.loading && state.seeds.isEmpty() -> CenterSpinner()
-                state.seeds.isEmpty() -> EmptyState(
+        PullToRefreshBox(
+            isRefreshing = state.loading,
+            onRefresh = actions.onRefresh,
+            modifier = Modifier.weight(1f),
+        ) {
+            if (state.visibleSeeds.isEmpty() && !state.loading) {
+                EmptyState(
                     configured = state.backendConfigured,
+                    filtered = state.filter != null || state.tagFilter != null,
                     onEditAddress = { showAddressDialog = true },
+                    onClearFilters = actions.onClearFilters,
                 )
-                else -> SeedList(
-                    seeds = state.seeds,
-                    selected = state.selectedIds,
-                    expandedSeedId = state.expandedSeedId,
-                    chatPendingId = state.chatPendingId,
-                    actions = actions,
-                )
+            } else {
+                LazyColumn(
+                    contentPadding = PaddingValues(start = 12.dp, end = 12.dp, bottom = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    items(state.visibleSeeds, key = { it.key }) { seed ->
+                        SeedCard(
+                            seed = seed,
+                            selected = seed.remoteId in state.selectedIds,
+                            expanded = seed.key == state.expandedSeedKey,
+                            chatOpen = seed.key == state.chatSeedKey,
+                            chatPending = seed.remoteId != null &&
+                                seed.remoteId == state.chatPendingId,
+                            actions = actions,
+                        )
+                    }
+                }
             }
-        }
-
-        if (state.ideas.isNotEmpty()) {
-            IdeasResult(ideas = state.ideas, onCopy = actions.onCopy, onClear = actions.onClearIdeas)
         }
 
         BottomBar(
@@ -107,6 +133,37 @@ fun IdeasScreen(state: IdeasUiState, actions: IdeasActions) {
             onSteerChange = { steer = it },
             onGenerate = { actions.onGenerate(steer) },
             onAddManual = { showManualDialog = true },
+            onClearSelection = actions.onClearSelection,
+        )
+    }
+
+    // Ideas get the whole sheet. They were previously squeezed into a 320dp strip
+    // at the bottom, which a single thread idea overflowed on its own.
+    if (state.ideas.isNotEmpty()) {
+        ModalBottomSheet(
+            onDismissRequest = actions.onClearIdeas,
+            sheetState = sheetState,
+        ) {
+            IdeasSheet(
+                ideas = state.ideas,
+                generating = state.generating,
+                onCopy = actions.onCopy,
+                onRegenerate = { actions.onGenerate(steer) },
+            )
+        }
+    }
+
+    state.pendingDelete?.let { seed ->
+        AlertDialog(
+            onDismissRequest = actions.onCancelDelete,
+            title = { Text("Delete this seed?") },
+            text = { Text(seed.headline, style = MaterialTheme.typography.bodyMedium) },
+            confirmButton = {
+                TextButton(onClick = { actions.onConfirmDelete(seed) }) {
+                    Text("Delete", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = { TextButton(onClick = actions.onCancelDelete) { Text("Cancel") } },
         )
     }
 
@@ -140,8 +197,8 @@ fun IdeasScreen(state: IdeasUiState, actions: IdeasActions) {
 }
 
 @Composable
-private fun Header(pendingCount: Int, onRefresh: () -> Unit, onEditAddress: () -> Unit) {
-    Column(modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 20.dp)) {
+private fun Header(pendingCount: Int, serverReachable: Boolean?, onEditAddress: () -> Unit) {
+    Column(modifier = Modifier.padding(start = 16.dp, end = 8.dp, top = 18.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
                 text = "Ideas",
@@ -149,36 +206,88 @@ private fun Header(pendingCount: Int, onRefresh: () -> Unit, onEditAddress: () -
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.weight(1f),
             )
-            TextButton(onClick = onEditAddress) { Text("Server") }
-            TextButton(onClick = onRefresh) { Text("Refresh") }
+            // A dot beats a word: the only thing worth knowing at a glance is
+            // whether the laptop is answering.
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(14.dp))
+                    .clickable(onClick = onEditAddress)
+                    .padding(horizontal = 10.dp, vertical = 6.dp),
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(7.dp)
+                        .clip(CircleShape)
+                        .background(
+                            when (serverReachable) {
+                                true -> Color(0xFF00BA7C)
+                                false -> MaterialTheme.colorScheme.error
+                                null -> MaterialTheme.colorScheme.outline
+                            },
+                        ),
+                )
+                Text(
+                    text = "server",
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(start = 6.dp),
+                )
+            }
         }
         Text(
             text = if (pendingCount > 0) {
-                "$pendingCount waiting to sync"
+                "$pendingCount waiting to sync · pull down to retry"
             } else {
-                "Seeds saved from your replies and posts"
+                "Saved from your replies and posts · pull down to refresh"
             },
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(bottom = 2.dp),
         )
     }
 }
 
 @Composable
-private fun FilterRow(selected: SeedStatus?, onSelect: (SeedStatus?) -> Unit) {
-    Row(
-        modifier = Modifier
-            .padding(horizontal = 16.dp, vertical = 12.dp)
-            .horizontalScroll(rememberScrollState()),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        FilterChip(label = "all", active = selected == null, onClick = { onSelect(null) })
-        SeedStatus.entries.forEach { status ->
-            FilterChip(
-                label = status.label,
-                active = selected == status,
-                onClick = { onSelect(status) },
-            )
+private fun FilterBar(
+    status: SeedStatus?,
+    tag: String?,
+    tags: List<String>,
+    onStatus: (SeedStatus?) -> Unit,
+    onTag: (String?) -> Unit,
+) {
+    Column {
+        Row(
+            modifier = Modifier
+                .padding(horizontal = 16.dp, vertical = 10.dp)
+                .horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(7.dp),
+        ) {
+            FilterChip(label = "all", active = status == null, onClick = { onStatus(null) })
+            SeedStatus.entries.forEach { entry ->
+                FilterChip(
+                    label = entry.label,
+                    active = status == entry,
+                    onClick = { onStatus(entry) },
+                )
+            }
+        }
+        // Tags only appear once there is more than one to choose between.
+        if (tags.size > 1) {
+            Row(
+                modifier = Modifier
+                    .padding(start = 16.dp, end = 16.dp, bottom = 8.dp)
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                tags.forEach { entry ->
+                    TagChip(
+                        label = entry,
+                        active = tag == entry,
+                        onClick = { onTag(if (tag == entry) null else entry) },
+                    )
+                }
+            }
         }
     }
 }
@@ -197,273 +306,140 @@ private fun FilterChip(label: String, active: Boolean, onClick: () -> Unit) {
         Text(
             text = label,
             style = MaterialTheme.typography.labelMedium,
-            color = if (active) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
+            color = if (active) {
+                MaterialTheme.colorScheme.onPrimary
+            } else {
+                MaterialTheme.colorScheme.onSurfaceVariant
+            },
             modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp),
         )
     }
 }
 
 @Composable
-private fun SeedList(
-    seeds: List<StoredSeed>,
-    selected: Set<String>,
-    expandedSeedId: String?,
-    chatPendingId: String?,
-    actions: IdeasActions,
-) {
-    LazyColumn(
-        contentPadding = androidx.compose.foundation.layout.PaddingValues(
-            start = 16.dp, end = 16.dp, bottom = 12.dp,
-        ),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        items(seeds, key = { it.clientSeedId.ifEmpty { it.remoteId.orEmpty() } }) { seed ->
-            SeedCard(
-                seed = seed,
-                selected = seed.remoteId in selected,
-                expanded = seed.remoteId != null && seed.remoteId == expandedSeedId,
-                chatPending = seed.remoteId != null && seed.remoteId == chatPendingId,
-                actions = actions,
-            )
-        }
-    }
-}
-
-@Composable
-private fun SeedCard(
-    seed: StoredSeed,
-    selected: Boolean,
-    expanded: Boolean,
-    chatPending: Boolean,
-    actions: IdeasActions,
-) {
-    Surface(
-        shape = RoundedCornerShape(14.dp),
-        color = if (selected) {
-            MaterialTheme.colorScheme.primary.copy(alpha = 0.10f)
+private fun TagChip(label: String, active: Boolean, onClick: () -> Unit) {
+    Text(
+        text = if (active) "$label ✕" else label,
+        fontSize = 11.sp,
+        color = if (active) {
+            MaterialTheme.colorScheme.onPrimaryContainer
         } else {
-            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
+            MaterialTheme.colorScheme.primary
         },
         modifier = Modifier
-            .fillMaxWidth()
-            .clickable { actions.onToggleSelect(seed) },
-    ) {
-        Column(modifier = Modifier.padding(14.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                SelectionDot(selected = selected)
-                Tag(text = seed.source.label, color = MaterialTheme.colorScheme.primary)
-                Tag(text = seed.status.label, color = seed.status.color)
-                if (seed.seed.shelfLife.isNotBlank()) {
-                    Tag(
-                        text = seed.seed.shelfLife,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                Box(modifier = Modifier.weight(1f))
-                Text(
-                    text = if (seed.isPending) "syncing" else relativeAge(seed.createdAtMillis),
-                    fontSize = 10.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-
-            Text(
-                text = seed.headline,
-                style = MaterialTheme.typography.bodyLarge,
-                modifier = Modifier.padding(top = 8.dp),
-            )
-
-            if (seed.note.isBlank() && seed.seed.angleHint.isNotBlank() &&
-                seed.seed.tension.isNotBlank()
-            ) {
-                Text(
-                    text = seed.seed.angleHint,
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontStyle = FontStyle.Italic,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(top = 4.dp),
-                )
-            }
-
-            if (seed.seed.themeTags.isNotEmpty()) {
-                Text(
-                    text = seed.seed.themeTags.joinToString(" · "),
-                    fontSize = 11.sp,
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.padding(top = 6.dp),
-                )
-            }
-
-            if (seed.postAuthor.isNotBlank()) {
-                Text(
-                    text = "from ${seed.postAuthor}",
-                    fontSize = 10.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(top = 6.dp),
-                )
-            }
-
-            // A pending seed has no server id, so there is nothing to PATCH yet
-            // and no conversation can be hung off it.
-            if (!seed.isPending) {
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    modifier = Modifier
-                        .padding(top = 8.dp)
-                        .horizontalScroll(rememberScrollState()),
-                ) {
-                    SeedStatus.entries.filter { it != seed.status }.forEach { status ->
-                        SmallAction(
-                            label = "mark ${status.label}",
-                            onClick = { actions.onSetStatus(seed, status) },
-                        )
-                    }
-                    SmallAction(
-                        label = when {
-                            expanded -> "hide chat"
-                            seed.chat.isEmpty() -> "chat"
-                            else -> "chat (${seed.chat.size})"
-                        },
-                        emphasised = seed.chat.isNotEmpty(),
-                        onClick = { actions.onToggleChat(seed) },
-                    )
-                }
-
-                if (expanded) {
-                    ChatThread(
-                        chat = seed.chat,
-                        pending = chatPending,
-                        quickPrompts = SEED_QUICK_PROMPTS,
-                        title = "Develop this idea",
-                        onCopyText = actions.onCopy,
-                        onSend = { actions.onSendChat(seed, it) },
-                        // Nothing to do here: unlike the overlay panels, an activity
-                        // already has window focus, so the keyboard just works.
-                        onFocusChanged = {},
-                    )
-                    if (seed.chat.isNotEmpty()) {
-                        TextButton(onClick = { actions.onClearChat(seed) }) {
-                            Text(text = "clear chat", fontSize = 11.sp)
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun SmallAction(label: String, emphasised: Boolean = false, onClick: () -> Unit) {
-    OutlinedButton(
-        onClick = onClick,
-        contentPadding = androidx.compose.foundation.layout.PaddingValues(
-            horizontal = 12.dp, vertical = 2.dp,
-        ),
-    ) {
-        Text(
-            text = label,
-            fontSize = 11.sp,
-            fontWeight = if (emphasised) FontWeight.SemiBold else FontWeight.Normal,
-        )
-    }
-}
-
-@Composable
-private fun SelectionDot(selected: Boolean) {
-    Box(
-        contentAlignment = Alignment.Center,
-        modifier = Modifier
-            .padding(end = 8.dp)
-            .size(16.dp)
-            .clip(CircleShape)
+            .clip(RoundedCornerShape(14.dp))
             .background(
-                if (selected) {
-                    MaterialTheme.colorScheme.primary
+                if (active) {
+                    MaterialTheme.colorScheme.primaryContainer
                 } else {
-                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.25f)
+                    MaterialTheme.colorScheme.primary.copy(alpha = 0.09f)
                 },
-            ),
-    ) {
-        if (selected) Text(text = "✓", color = Color.White, fontSize = 9.sp)
-    }
-}
-
-@Composable
-private fun Tag(text: String, color: Color) {
-    Text(
-        text = text,
-        fontSize = 9.sp,
-        fontWeight = FontWeight.SemiBold,
-        color = Color.White,
-        modifier = Modifier
-            .padding(end = 5.dp)
-            .clip(RoundedCornerShape(4.dp))
-            .background(color)
-            .padding(horizontal = 6.dp, vertical = 2.dp),
+            )
+            .clickable(onClick = onClick)
+            .padding(horizontal = 11.dp, vertical = 6.dp),
     )
 }
 
 @Composable
-private fun IdeasResult(ideas: List<PostIdea>, onCopy: (String) -> Unit, onClear: () -> Unit) {
-    Surface(
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 12.dp)
-            // Capped and scrolled internally: a thread idea can run long, and
-            // without this the results push the seed list off the screen.
-            .heightIn(max = 320.dp),
+private fun IdeasSheet(
+    ideas: List<PostIdea>,
+    generating: Boolean,
+    onCopy: (String) -> Unit,
+    onRegenerate: () -> Unit,
+) {
+    val haptics = LocalHapticFeedback.current
+    var copiedIndex by remember { mutableIntStateOf(-1) }
+
+    LazyColumn(
+        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 32.dp),
+        modifier = Modifier.navigationBarsPadding(),
     ) {
-        Column(
-            modifier = Modifier
-                .verticalScroll(rememberScrollState())
-                .padding(12.dp),
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = "${ideas.size} post ideas · tap to copy",
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = FontWeight.SemiBold,
-                    modifier = Modifier.weight(1f),
-                )
-                TextButton(onClick = onClear) { Text("Clear") }
+        item {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.padding(bottom = 4.dp),
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "${ideas.size} post ideas",
+                        style = MaterialTheme.typography.titleMedium,
+                    )
+                    Text(
+                        text = "tap one to copy it",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                TextButton(onClick = onRegenerate, enabled = !generating) {
+                    Text(if (generating) "working" else "again")
+                }
             }
-            ideas.forEach { idea ->
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable {
-                            onCopy(listOf(idea.hook, idea.body).filter(String::isNotBlank)
-                                .joinToString("\n\n"))
-                        }
-                        .padding(vertical = 8.dp),
-                ) {
+        }
+
+        itemsIndexed(ideas) { index, idea ->
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(12.dp))
+                    .clickable {
+                        haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        onCopy(
+                            listOf(idea.hook, idea.body)
+                                .filter(String::isNotBlank)
+                                .joinToString("\n\n"),
+                        )
+                        copiedIndex = index
+                    }
+                    .padding(vertical = 12.dp),
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
                     if (idea.format.isNotBlank()) {
                         Text(
                             text = idea.format,
                             fontSize = 9.sp,
                             fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(5.dp))
+                                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f))
+                                .padding(horizontal = 6.dp, vertical = 2.dp),
                         )
                     }
-                    Text(text = idea.hook, style = MaterialTheme.typography.bodyLarge)
-                    if (idea.body.isNotBlank()) {
+                    if (copiedIndex == index) {
                         Text(
-                            text = idea.body,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                    if (idea.whyNow.isNotBlank()) {
-                        Text(
-                            text = "why now: ${idea.whyNow}",
+                            text = "copied",
                             fontSize = 10.sp,
-                            fontStyle = FontStyle.Italic,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.padding(start = 8.dp),
                         )
                     }
                 }
-                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                Text(
+                    text = idea.hook,
+                    style = MaterialTheme.typography.bodyLarge,
+                    modifier = Modifier.padding(top = 6.dp),
+                )
+                if (idea.body.isNotBlank()) {
+                    Text(
+                        text = idea.body,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 4.dp),
+                    )
+                }
+                if (idea.whyNow.isNotBlank()) {
+                    Text(
+                        text = "why now: ${idea.whyNow}",
+                        fontSize = 11.sp,
+                        fontStyle = FontStyle.Italic,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 6.dp),
+                    )
+                }
+                HorizontalDivider(
+                    color = MaterialTheme.colorScheme.outlineVariant,
+                    modifier = Modifier.padding(top = 12.dp),
+                )
             }
         }
     }
@@ -477,21 +453,47 @@ private fun BottomBar(
     onSteerChange: (String) -> Unit,
     onGenerate: () -> Unit,
     onAddManual: () -> Unit,
+    onClearSelection: () -> Unit,
 ) {
     Surface(tonalElevation = 3.dp, modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(12.dp)) {
-            if (selectedCount > 0) {
-                OutlinedTextField(
-                    value = steer,
-                    onValueChange = onSteerChange,
-                    placeholder = { Text("optional: what you want from this round") },
-                    textStyle = MaterialTheme.typography.bodyMedium,
-                    shape = RoundedCornerShape(18.dp),
-                    maxLines = 3,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = 8.dp),
-                )
+        Column(
+            modifier = Modifier
+                .imePadding()
+                .padding(horizontal = 12.dp, vertical = 10.dp),
+        ) {
+            AnimatedVisibility(visible = selectedCount > 0) {
+                Column {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(bottom = 6.dp),
+                    ) {
+                        Text(
+                            text = "$selectedCount selected",
+                            style = MaterialTheme.typography.labelMedium,
+                            modifier = Modifier.weight(1f),
+                        )
+                        Text(
+                            text = "clear",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .clickable(onClick = onClearSelection)
+                                .padding(horizontal = 8.dp, vertical = 4.dp),
+                        )
+                    }
+                    OutlinedTextField(
+                        value = steer,
+                        onValueChange = onSteerChange,
+                        placeholder = { Text("optional: what you want from this round") },
+                        textStyle = MaterialTheme.typography.bodyMedium,
+                        shape = RoundedCornerShape(18.dp),
+                        maxLines = 3,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 8.dp),
+                    )
+                }
             }
             Row(
                 verticalAlignment = Alignment.CenterVertically,
@@ -501,18 +503,22 @@ private fun BottomBar(
                 Button(
                     onClick = onGenerate,
                     enabled = selectedCount > 0 && !generating,
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier
+                        .weight(1f)
+                        .heightIn(min = 44.dp),
                 ) {
                     if (generating) {
+                        // The button is disabled while working, so its content
+                        // colour is the disabled one, not onPrimary.
                         CircularProgressIndicator(
-                            modifier = Modifier.size(14.dp),
+                            modifier = Modifier.size(15.dp),
                             strokeWidth = 2.dp,
-                            color = Color.White,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     } else {
                         Text(
                             text = if (selectedCount == 0) {
-                                "Pick seeds to build on"
+                                "Tick seeds to build on"
                             } else {
                                 "Generate post ideas ($selectedCount)"
                             },
@@ -525,14 +531,12 @@ private fun BottomBar(
 }
 
 @Composable
-private fun CenterSpinner() {
-    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        CircularProgressIndicator()
-    }
-}
-
-@Composable
-private fun EmptyState(configured: Boolean, onEditAddress: () -> Unit) {
+private fun EmptyState(
+    configured: Boolean,
+    filtered: Boolean,
+    onEditAddress: () -> Unit,
+    onClearFilters: () -> Unit,
+) {
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -541,10 +545,10 @@ private fun EmptyState(configured: Boolean, onEditAddress: () -> Unit) {
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
-                text = if (configured) {
-                    "No seeds yet. They save themselves when a post is worth building on."
-                } else {
-                    "Set the backend address to start banking ideas."
+                text = when {
+                    !configured -> "Set the backend address to start banking ideas."
+                    filtered -> "Nothing matches these filters."
+                    else -> "No seeds yet. They save themselves when a post is worth building on."
                 },
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -554,6 +558,11 @@ private fun EmptyState(configured: Boolean, onEditAddress: () -> Unit) {
                     onClick = onEditAddress,
                     modifier = Modifier.padding(top = 16.dp),
                 ) { Text("Set address") }
+            } else if (filtered) {
+                TextButton(
+                    onClick = onClearFilters,
+                    modifier = Modifier.padding(top = 8.dp),
+                ) { Text("Clear filters") }
             }
         }
     }
@@ -592,10 +601,9 @@ private fun TextEntryDialog(
             }
         },
         confirmButton = {
-            TextButton(
-                onClick = { onConfirm(text) },
-                enabled = text.isNotBlank(),
-            ) { Text(confirm) }
+            TextButton(onClick = { onConfirm(text) }, enabled = text.isNotBlank()) {
+                Text(confirm)
+            }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
     )

@@ -2,8 +2,8 @@ package com.yash.feedrunner.ui
 
 import android.content.Context
 import android.view.WindowManager
-import androidx.compose.material3.MaterialTheme
 import com.yash.feedrunner.data.ResultStore
+import com.yash.feedrunner.ui.theme.FeedRunnerTheme
 
 /** Shows the three-action menu that fans out from the bubble. */
 class MenuController(
@@ -27,7 +27,7 @@ class MenuController(
             if (saved.size > 1) "$age · ${saved.size} saved" else age
         }
         window.show {
-            MaterialTheme {
+            FeedRunnerTheme {
                 ActionMenu(
                     anchor = anchor,
                     lastResultAge = lastAge,

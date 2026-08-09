@@ -69,6 +69,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import com.yash.feedrunner.ui.theme.MetaTextStyle
 
 private val PanelShape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp)
 
@@ -243,11 +244,25 @@ private fun ReadyBody(
             capturePath = state.capturePath,
             onViewCapture = onViewCapture,
         )
+        // Which draft last got copied, so the confirmation lands on that card
+        // rather than as a toast that covers the next one.
+        var copiedId by remember(resultKey) { mutableIntStateOf(-1) }
+        LaunchedEffect(copiedId) {
+            if (copiedId >= 0) {
+                delay(COPIED_HINT_MS)
+                copiedId = -1
+            }
+        }
+
         state.drafts.forEach { draft ->
             DraftCard(
                 draft = draft,
                 refinements = refinements,
-                onCopy = { onDraftCopy(draft) },
+                copied = copiedId == draft.id,
+                onCopy = {
+                    onDraftCopy(draft)
+                    copiedId = draft.id
+                },
                 onRefine = { refinement -> onRefine(draft, refinement) },
             )
         }
@@ -451,9 +466,11 @@ private fun HistoryCard(entry: HistoryEntry, selected: Boolean, onClick: () -> U
 private fun DraftCard(
     draft: Draft,
     refinements: List<Refinement>,
+    copied: Boolean,
     onCopy: () -> Unit,
     onRefine: (Refinement) -> Unit,
 ) {
+    val haptics = LocalHapticFeedback.current
     Card(
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
@@ -493,8 +510,22 @@ private fun DraftCard(
                 modifier = Modifier
                     .padding(top = 8.dp)
                     .fillMaxWidth()
-                    .clickable(enabled = !draft.refining, onClick = onCopy),
+                    .clickable(enabled = !draft.refining) {
+                        // A tap that puts something on the clipboard should be felt,
+                        // since the visual change is small and easy to miss.
+                        haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        onCopy()
+                    },
             )
+
+            AnimatedVisibility(visible = copied) {
+                Text(
+                    text = "copied, paste in X",
+                    style = MetaTextStyle,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(top = 4.dp),
+                )
+            }
 
             Row(
                 modifier = Modifier

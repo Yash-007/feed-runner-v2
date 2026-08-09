@@ -1,4 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="AppTheme" parent="android:Theme.Material.Light.NoActionBar" />
+    <!--
+        The platform has no DayNight Material theme, so the window background is a
+        night-qualified colour instead. It only shows during the first frame, since
+        every screen paints its own Surface, but a white flash before a dark screen
+        is exactly the kind of thing that reads as cheap.
+    -->
+    <style name="AppTheme" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/window_background</item>
+    </style>
 </resources>

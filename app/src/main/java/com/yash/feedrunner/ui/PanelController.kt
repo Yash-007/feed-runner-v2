@@ -10,7 +10,6 @@ import android.util.Log
 import android.view.Gravity
 import android.view.WindowManager
 import android.widget.Toast
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -22,6 +21,7 @@ import com.yash.feedrunner.data.ResultStore
 import com.yash.feedrunner.work.AnalysisManager
 import com.yash.feedrunner.data.VoiceRulesStore
 import java.util.concurrent.Executors
+import com.yash.feedrunner.ui.theme.FeedRunnerTheme
 
 /**
  * Owns the reply panel overlay: showing it, running the API calls that fill it,
@@ -161,7 +161,7 @@ class PanelController(
         generation++
         state = PanelState.Loading
         window.show(gravity = Gravity.BOTTOM) {
-            MaterialTheme {
+            FeedRunnerTheme {
                 ReplyPanel(
                     state = state,
                     onDraftCopy = ::copyDraft,
@@ -285,7 +285,6 @@ class PanelController(
         clipboard.setPrimaryClip(ClipData.newPlainText("reply", draft.text))
         // Deliberately does not dismiss: copying one draft is often followed by
         // copying another, or by carrying on the chat.
-        Toast.makeText(context, "Copied, paste in X", Toast.LENGTH_SHORT).show()
     }
 
     private companion object {

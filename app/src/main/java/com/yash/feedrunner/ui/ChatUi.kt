@@ -323,7 +323,7 @@ private fun ChatInput(
                 )
                 .clickable(enabled = canSend, onClick = onSend),
         ) {
-            Text(text = "↑", color = Color.White, fontSize = 19.sp)
+            Text(text = "↑", color = MaterialTheme.colorScheme.onPrimary, fontSize = 19.sp)
         }
     }
 }
@@ -347,7 +347,7 @@ internal fun JumpToBottom(visible: Boolean, onClick: () -> Unit, modifier: Modif
                 .clickable(onClick = onClick),
         ) {
             Box(contentAlignment = Alignment.Center) {
-                Text(text = "↓", color = Color.White, fontSize = 18.sp)
+                Text(text = "↓", color = MaterialTheme.colorScheme.onPrimary, fontSize = 18.sp)
             }
         }
     }
@@ -356,7 +356,8 @@ internal fun JumpToBottom(visible: Boolean, onClick: () -> Unit, modifier: Modif
 /** Ignore a few stray pixels so the button doesn't flicker at the very bottom. */
 internal const val JUMP_VISIBLE_SLOP = 24
 
-private const val COPIED_HINT_MS = 1400L
+/** Shared so every copy confirmation in the app clears at the same pace. */
+internal const val COPIED_HINT_MS = 1400L
 
 internal val REPLY_QUICK_PROMPTS = listOf(
     "another angle",

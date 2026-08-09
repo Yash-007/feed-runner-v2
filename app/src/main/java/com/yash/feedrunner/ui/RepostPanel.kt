@@ -386,7 +386,7 @@ private fun Composer(
                         RepostMode.POST -> "Draft 6 posts"
                         RepostMode.QUOTE -> "Draft 6 quote posts"
                     },
-                    color = Color.White,
+                    color = MaterialTheme.colorScheme.onPrimary,
                     style = MaterialTheme.typography.labelLarge,
                     fontWeight = FontWeight.SemiBold,
                 )

@@ -24,6 +24,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Surface
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.getValue
@@ -38,6 +39,7 @@ import com.yash.feedrunner.bubble.BubbleService
 import com.yash.feedrunner.ui.ideas.IdeasActivity
 import com.yash.feedrunner.capture.CaptureService
 import com.yash.feedrunner.data.VoiceRulesStore
+import com.yash.feedrunner.ui.theme.FeedRunnerTheme
 
 class MainActivity : ComponentActivity() {
 
@@ -58,9 +60,10 @@ class MainActivity : ComponentActivity() {
         val apiKeyConfigured = BuildConfig.ANTHROPIC_API_KEY.isNotBlank()
 
         setContent {
-            MaterialTheme {
+            FeedRunnerTheme {
                 var voiceRules by remember { mutableStateOf(voiceRulesStore.rules) }
 
+                Surface(modifier = Modifier.fillMaxSize()) {
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
@@ -129,6 +132,7 @@ class MainActivity : ComponentActivity() {
                             }
                         }
                     }
+                }
                 }
             }
         }

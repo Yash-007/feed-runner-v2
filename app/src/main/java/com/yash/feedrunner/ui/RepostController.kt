@@ -10,7 +10,6 @@ import android.util.Log
 import android.view.Gravity
 import android.view.WindowManager
 import android.widget.Toast
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -23,6 +22,7 @@ import com.yash.feedrunner.data.RepostStore
 import com.yash.feedrunner.data.VoiceRulesStore
 import java.io.File
 import java.util.concurrent.Executors
+import com.yash.feedrunner.ui.theme.FeedRunnerTheme
 
 /**
  * Owns the compose overlay: capture in, optional thought or instruction, six
@@ -102,7 +102,7 @@ class RepostController(
 
     private fun open() {
         window.show(gravity = Gravity.BOTTOM) {
-            MaterialTheme {
+            FeedRunnerTheme {
                 RepostPanel(
                     state = state,
                     mode = mode,

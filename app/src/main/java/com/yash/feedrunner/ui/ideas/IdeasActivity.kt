@@ -7,7 +7,6 @@ import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -19,9 +18,14 @@ import com.yash.feedrunner.ui.ChatRole
 import com.yash.feedrunner.ui.PostIdea
 import com.yash.feedrunner.ui.SeedStatus
 import com.yash.feedrunner.ui.StoredSeed
+import com.yash.feedrunner.ui.theme.FeedRunnerTheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+
+/** A stable identity for list keys: a queued seed has no server id yet. */
+internal val StoredSeed.key: String
+    get() = remoteId ?: "pending-$clientSeedId"
 
 /** Everything the Ideas screen renders. */
 data class IdeasUiState(
@@ -29,24 +33,49 @@ data class IdeasUiState(
     val selectedIds: Set<String> = emptySet(),
     val ideas: List<PostIdea> = emptyList(),
     val filter: SeedStatus? = null,
+    /** Theme tag to narrow by, applied on top of the status filter. */
+    val tagFilter: String? = null,
     val loading: Boolean = false,
     val generating: Boolean = false,
     val message: String? = null,
     val pendingCount: Int = 0,
     val baseUrl: String = "",
-    /** Seed whose conversation is open, if any. Only one at a time. */
-    val expandedSeedId: String? = null,
-    /** Seed waiting on a chat reply, so only that thread shows a spinner. */
+    /** Card showing its full detail. Null when everything is collapsed. */
+    val expandedSeedKey: String? = null,
+    /** Card with its conversation open. Always also expanded. */
+    val chatSeedKey: String? = null,
     val chatPendingId: String? = null,
+    /** Null until the first load answers either way. */
+    val serverReachable: Boolean? = null,
+    val pendingDelete: StoredSeed? = null,
 ) {
     val backendConfigured: Boolean get() = baseUrl.isNotEmpty()
+
+    /** Tags across everything loaded, most common first, so the row is useful. */
+    val availableTags: List<String>
+        get() = seeds
+            .flatMap { it.seed.themeTags }
+            .groupingBy { it }
+            .eachCount()
+            .entries
+            .sortedWith(compareByDescending<Map.Entry<String, Int>> { it.value }.thenBy { it.key })
+            .map { it.key }
+            .take(MAX_TAG_CHIPS)
+
+    /** The status filter is applied server-side; the tag filter is local. */
+    val visibleSeeds: List<StoredSeed>
+        get() = tagFilter?.let { tag -> seeds.filter { tag in it.seed.themeTags } } ?: seeds
 }
 
 /** Callbacks the screen invokes, kept in one place so the composable stays dumb. */
 data class IdeasActions(
     val onRefresh: () -> Unit,
     val onFilterChange: (SeedStatus?) -> Unit,
+    val onTagFilterChange: (String?) -> Unit,
+    val onClearFilters: () -> Unit,
     val onToggleSelect: (StoredSeed) -> Unit,
+    val onClearSelection: () -> Unit,
+    val onToggleExpand: (StoredSeed) -> Unit,
     val onSetStatus: (StoredSeed, SeedStatus) -> Unit,
     val onGenerate: (String) -> Unit,
     val onAddManual: (String) -> Unit,
@@ -55,7 +84,9 @@ data class IdeasActions(
     val onClearIdeas: () -> Unit,
     val onToggleChat: (StoredSeed) -> Unit,
     val onSendChat: (StoredSeed, String) -> Unit,
-    val onClearChat: (StoredSeed) -> Unit,
+    val onAskDelete: (StoredSeed) -> Unit,
+    val onConfirmDelete: (StoredSeed) -> Unit,
+    val onCancelDelete: () -> Unit,
 )
 
 /**
@@ -75,14 +106,21 @@ class IdeasActivity : ComponentActivity() {
         state = state.copy(baseUrl = repository.backendConfig.baseUrl)
 
         setContent {
-            MaterialTheme {
+            FeedRunnerTheme {
                 Surface {
                     IdeasScreen(
                         state = state,
                         actions = IdeasActions(
                             onRefresh = ::refresh,
                             onFilterChange = ::changeFilter,
+                            onTagFilterChange = { state = state.copy(tagFilter = it) },
+                            onClearFilters = {
+                                state = state.copy(tagFilter = null)
+                                changeFilter(null)
+                            },
                             onToggleSelect = ::toggleSelect,
+                            onClearSelection = { state = state.copy(selectedIds = emptySet()) },
+                            onToggleExpand = ::toggleExpand,
                             onSetStatus = ::setStatus,
                             onGenerate = ::generate,
                             onAddManual = ::addManual,
@@ -91,7 +129,9 @@ class IdeasActivity : ComponentActivity() {
                             onClearIdeas = { state = state.copy(ideas = emptyList()) },
                             onToggleChat = ::toggleChat,
                             onSendChat = ::sendChat,
-                            onClearChat = ::clearChat,
+                            onAskDelete = { state = state.copy(pendingDelete = it) },
+                            onConfirmDelete = ::delete,
+                            onCancelDelete = { state = state.copy(pendingDelete = null) },
                         ),
                     )
                 }
@@ -117,7 +157,12 @@ class IdeasActivity : ComponentActivity() {
 
             state = outcome.fold(
                 onSuccess = { seeds ->
-                    state.copy(seeds = seeds, loading = false, pendingCount = pending)
+                    state.copy(
+                        seeds = seeds,
+                        loading = false,
+                        pendingCount = pending,
+                        serverReachable = true,
+                    )
                 },
                 onFailure = { error ->
                     // Falling back to the queue rather than an empty screen: those
@@ -127,6 +172,7 @@ class IdeasActivity : ComponentActivity() {
                         seeds = queued,
                         loading = false,
                         pendingCount = pending,
+                        serverReachable = false,
                         message = error.message ?: "Could not reach the backend",
                     )
                 },
@@ -150,26 +196,43 @@ class IdeasActivity : ComponentActivity() {
         state = state.copy(selectedIds = selected)
     }
 
+    /** Collapsing a card also closes its conversation; nothing stays open offscreen. */
+    private fun toggleExpand(seed: StoredSeed) {
+        val opening = seed.key != state.expandedSeedKey
+        state = state.copy(
+            expandedSeedKey = seed.key.takeIf { opening },
+            chatSeedKey = state.chatSeedKey.takeIf { opening && it == seed.key },
+        )
+    }
+
     private fun setStatus(seed: StoredSeed, status: SeedStatus) {
         lifecycleScope.launch {
             val outcome = withContext(Dispatchers.IO) { repository.setStatus(seed, status) }
             outcome.fold(
                 onSuccess = { updated ->
-                    state = state.copy(
-                        seeds = state.seeds.map {
-                            if (it.clientSeedId == seed.clientSeedId ||
-                                it.remoteId == seed.remoteId
-                            ) {
-                                updated
-                            } else {
-                                it
-                            }
-                        },
-                    )
+                    state = state.copy(seeds = state.seeds.replacing(updated))
                     // A status change can move a seed out of the active filter.
                     if (state.filter != null) refresh()
                 },
                 onFailure = { toast(it.message ?: "Could not update") },
+            )
+        }
+    }
+
+    private fun delete(seed: StoredSeed) {
+        state = state.copy(pendingDelete = null)
+        lifecycleScope.launch {
+            val outcome = withContext(Dispatchers.IO) { repository.delete(seed) }
+            outcome.fold(
+                onSuccess = {
+                    state = state.copy(
+                        seeds = state.seeds.filterNot { it.key == seed.key },
+                        selectedIds = state.selectedIds - seed.remoteId.orEmpty(),
+                        expandedSeedKey = state.expandedSeedKey.takeIf { it != seed.key },
+                        chatSeedKey = state.chatSeedKey.takeIf { it != seed.key },
+                    )
+                },
+                onFailure = { toast(it.message ?: "Could not delete") },
             )
         }
     }
@@ -179,9 +242,7 @@ class IdeasActivity : ComponentActivity() {
             toast("That seed has not synced yet")
             return
         }
-        state = state.copy(
-            expandedSeedId = seed.remoteId.takeIf { it != state.expandedSeedId },
-        )
+        state = state.copy(chatSeedKey = seed.key.takeIf { it != state.chatSeedKey })
     }
 
     private fun sendChat(seed: StoredSeed, message: String) {
@@ -205,19 +266,11 @@ class IdeasActivity : ComponentActivity() {
         }
     }
 
-    private fun clearChat(seed: StoredSeed) {
-        lifecycleScope.launch {
-            val outcome = withContext(Dispatchers.IO) { repository.clearChat(seed) }
-            outcome.fold(
-                onSuccess = { state = state.copy(seeds = state.seeds.replacing(it)) },
-                onFailure = { toast(it.message ?: "Could not clear the chat") },
-            )
-        }
-    }
-
     /** Swaps in an updated seed, matched on whichever id it has. */
     private fun List<StoredSeed>.replacing(updated: StoredSeed): List<StoredSeed> = map { seed ->
-        if (seed.remoteId == updated.remoteId || seed.clientSeedId == updated.clientSeedId) {
+        if (seed.clientSeedId == updated.clientSeedId ||
+            (seed.remoteId != null && seed.remoteId == updated.remoteId)
+        ) {
             updated
         } else {
             seed
@@ -249,17 +302,19 @@ class IdeasActivity : ComponentActivity() {
 
     private fun setBaseUrl(url: String) {
         repository.backendConfig.baseUrl = url
-        state = state.copy(baseUrl = repository.backendConfig.baseUrl)
+        state = state.copy(baseUrl = repository.backendConfig.baseUrl, serverReachable = null)
         refresh()
     }
 
     private fun copy(text: String) {
         val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
         clipboard.setPrimaryClip(ClipData.newPlainText("idea", text))
-        toast("copied")
     }
 
     private fun toast(message: String) {
         Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
     }
 }
+
+/** Enough to be useful without the row becoming its own scrolling problem. */
+private const val MAX_TAG_CHIPS = 8
