@@ -35,6 +35,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.yash.feedrunner.bubble.BubbleService
+import com.yash.feedrunner.ui.ideas.IdeasActivity
 import com.yash.feedrunner.capture.CaptureService
 import com.yash.feedrunner.data.VoiceRulesStore
 
@@ -116,6 +117,15 @@ class MainActivity : ComponentActivity() {
                             }
                             OutlinedButton(onClick = { BubbleService.stop(this@MainActivity) }) {
                                 Text("Stop")
+                            }
+                            OutlinedButton(
+                                onClick = {
+                                    startActivity(
+                                        Intent(this@MainActivity, IdeasActivity::class.java),
+                                    )
+                                },
+                            ) {
+                                Text("Ideas")
                             }
                         }
                     }

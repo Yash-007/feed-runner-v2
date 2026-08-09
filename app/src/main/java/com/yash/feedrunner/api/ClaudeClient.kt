@@ -21,6 +21,7 @@ import com.yash.feedrunner.ui.Angle
 import com.yash.feedrunner.ui.ChatMessage
 import com.yash.feedrunner.ui.ChatRole
 import com.yash.feedrunner.ui.Draft
+import com.yash.feedrunner.ui.IdeaSeed
 import com.yash.feedrunner.ui.CaptureContext
 import com.yash.feedrunner.ui.PostContext
 import com.yash.feedrunner.ui.PostDraft
@@ -34,12 +35,16 @@ data class RepostAnalysis(
     val capture: CaptureContext,
     val reading: TextReading,
     val drafts: List<PostDraft>,
+    /** Null when the model judged the post not worth banking an idea from. */
+    val ideaSeed: IdeaSeed? = null,
 )
 
 /** Everything one analysis returns. */
 data class Analysis(
     val postContext: PostContext,
     val drafts: List<Draft>,
+    /** Null when the model judged the post not worth banking an idea from. */
+    val ideaSeed: IdeaSeed? = null,
 )
 
 /**
@@ -365,7 +370,12 @@ class ClaudeClient(apiKey: String) {
         }
         if (drafts.isEmpty()) throw ClaudeException("Claude returned no drafts. Try again.")
 
-        return RepostAnalysis(capture = capture, reading = reading, drafts = drafts)
+        return RepostAnalysis(
+            capture = capture,
+            reading = reading,
+            drafts = drafts,
+            ideaSeed = parseIdeaSeed(fields["idea_seed"]),
+        )
     }
 
     private fun repostSystemBlocks(extraVoiceRules: String): List<TextBlockParam> = buildList {
@@ -446,6 +456,7 @@ class ClaudeClient(apiKey: String) {
                     .properties(
                         Tool.InputSchema.Properties.builder()
                             .putAdditionalProperty("capture_context", captureSchema)
+                            .putAdditionalProperty("idea_seed", ideaSeedSchema())
                             .putAdditionalProperty(
                                 "user_text_read_as",
                                 JsonValue.from(
@@ -600,6 +611,58 @@ class ClaudeClient(apiKey: String) {
         .replace(Regex("\n{3,}"), "\n\n")
         .trim()
 
+    /**
+     * Reads the optional idea_seed. The field is frequently absent or null, which
+     * is not an error: it means this post was not worth banking an idea from.
+     */
+    private fun parseIdeaSeed(raw: Any?): IdeaSeed? {
+        val fields = raw as? Map<*, *> ?: return null
+        val tags = (fields["theme_tags"] as? List<*>)
+            ?.mapNotNull { (it as? String)?.trim()?.takeIf(String::isNotEmpty) }
+            .orEmpty()
+        val seed = IdeaSeed(
+            themeTags = tags,
+            tension = (fields["tension"] as? String)?.trim().orEmpty(),
+            angleHint = (fields["angle_hint"] as? String)?.trim().orEmpty(),
+            shelfLife = (fields["shelf_life"] as? String)?.trim().orEmpty(),
+        )
+        return seed.takeUnless { it.isEmpty }
+    }
+
+    /**
+     * Declared on both tools so the phone can bank the thought behind a post.
+     * Deliberately not in either tool's `required` list: forcing it would make the
+     * model invent a seed for every throwaway post.
+     */
+    private fun ideaSeedSchema(): JsonValue = JsonValue.from(
+        mapOf(
+            "type" to "object",
+            "description" to "The reusable idea behind this post, for the idea bank. " +
+                "Omit entirely unless the post raises something worth writing about " +
+                "later, independently of this reply.",
+            "properties" to mapOf(
+                "theme_tags" to mapOf(
+                    "type" to "array",
+                    "description" to "Recurring subjects this touches, 1-4 short tags.",
+                    "items" to mapOf("type" to "string"),
+                ),
+                "tension" to mapOf(
+                    "type" to "string",
+                    "description" to "The disagreement or friction worth writing into, one line.",
+                ),
+                "angle_hint" to mapOf(
+                    "type" to "string",
+                    "description" to "A direction a future post could take on this, one line.",
+                ),
+                "shelf_life" to mapOf(
+                    "type" to "string",
+                    "enum" to listOf("hours", "days", "weeks", "evergreen"),
+                    "description" to "How long this stays worth posting about.",
+                ),
+            ),
+        ),
+    )
+
     private fun parseAnalysis(fields: Map<String, Any?>): Analysis {
         val context = fields["post_context"] as? Map<*, *>
         val postContext = PostContext(
@@ -627,7 +690,11 @@ class ClaudeClient(apiKey: String) {
         }
         if (drafts.isEmpty()) throw ClaudeException("Claude returned no drafts. Try again.")
 
-        return Analysis(postContext = postContext, drafts = drafts)
+        return Analysis(
+            postContext = postContext,
+            drafts = drafts,
+            ideaSeed = parseIdeaSeed(fields["idea_seed"]),
+        )
     }
 
     private fun draftsTool(): Tool {
@@ -703,6 +770,7 @@ class ClaudeClient(apiKey: String) {
                     .properties(
                         Tool.InputSchema.Properties.builder()
                             .putAdditionalProperty("post_context", postContextSchema)
+                            .putAdditionalProperty("idea_seed", ideaSeedSchema())
                             .putAdditionalProperty(
                                 "drafts",
                                 JsonValue.from(

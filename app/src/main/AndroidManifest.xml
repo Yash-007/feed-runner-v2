@@ -8,9 +8,17 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.INTERNET" />
 
+    <!--
+        Cleartext is on because the Idea Bank backend runs on a laptop reachable
+        only over the local network, at an address that changes, so it cannot be
+        pinned to a domain here and has no certificate. The Claude API calls go
+        over HTTPS regardless. Turn this off once the backend moves somewhere with
+        a real hostname.
+    -->
     <application
         android:label="Feed Runner"
         android:theme="@style/AppTheme"
+        android:usesCleartextTraffic="true"
         android:allowBackup="false">
 
         <activity
@@ -42,6 +50,12 @@
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
                 android:value="Floating reply-assistant bubble overlay" />
         </service>
+
+        <activity
+            android:name=".ui.ideas.IdeasActivity"
+            android:exported="false"
+            android:label="Ideas"
+            android:windowSoftInputMode="adjustResize" />
 
     </application>
 </manifest>

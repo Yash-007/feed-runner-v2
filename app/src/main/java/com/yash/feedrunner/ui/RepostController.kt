@@ -18,6 +18,7 @@ import com.yash.feedrunner.BuildConfig
 import com.yash.feedrunner.api.ClaudeClient
 import com.yash.feedrunner.api.ClaudeException
 import com.yash.feedrunner.api.ImagePrep
+import com.yash.feedrunner.data.IdeaBankRepository
 import com.yash.feedrunner.data.RepostStore
 import com.yash.feedrunner.data.VoiceRulesStore
 import java.io.File
@@ -42,6 +43,7 @@ class RepostController(
     private val window = OverlayWindow(context, windowManager)
     private val voiceRulesStore = VoiceRulesStore(context)
     private val store = RepostStore(context)
+    private val ideaBank = IdeaBankRepository(context)
     private val captureDir = File(context.filesDir, "repost").apply { mkdirs() }
 
     private val claude: ClaudeClient? by lazy {
@@ -160,6 +162,19 @@ class RepostController(
                             savedAtMillis = System.currentTimeMillis(),
                         )
                         store.save(result)
+                        // First generation for this capture only; refinements and
+                        // chat never come through here.
+                        ideaBank.record(
+                            seed = analysis.ideaSeed,
+                            source = when (requestedMode) {
+                                RepostMode.POST -> SeedSource.POST
+                                RepostMode.QUOTE -> SeedSource.QUOTE
+                            },
+                            clientSeedId = "${requestedMode.wire}-${result.savedAtMillis}",
+                            postAuthor = analysis.capture.quotedAuthor.orEmpty(),
+                            postText = analysis.capture.summary,
+                            capturedAtMillis = result.savedAtMillis,
+                        )
                         heldResult = result
                         if (window.isShowing) {
                             state = RepostState.Ready(result)

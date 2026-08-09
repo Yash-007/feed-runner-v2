@@ -9,8 +9,10 @@ import com.yash.feedrunner.BuildConfig
 import com.yash.feedrunner.api.ClaudeClient
 import com.yash.feedrunner.api.ClaudeException
 import com.yash.feedrunner.api.ImagePrep
+import com.yash.feedrunner.data.IdeaBankRepository
 import com.yash.feedrunner.data.ResultStore
 import com.yash.feedrunner.data.VoiceRulesStore
+import com.yash.feedrunner.ui.SeedSource
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicInteger
 
@@ -26,6 +28,7 @@ import java.util.concurrent.atomic.AtomicInteger
 class AnalysisManager(
     context: Context,
     private val resultStore: ResultStore,
+    private val ideaBank: IdeaBankRepository,
 ) {
     sealed interface Update {
         val jobId: Long
@@ -92,6 +95,16 @@ class AnalysisManager(
                     postContext = analysis.postContext,
                     drafts = analysis.drafts,
                     screenshot = screenshot,
+                )
+                // Banked off the first generation only, keyed on the saved result
+                // so a reopen or a refinement can never bank the same post twice.
+                ideaBank.record(
+                    seed = analysis.ideaSeed,
+                    source = SeedSource.REPLY,
+                    clientSeedId = "reply-${saved.id}",
+                    postAuthor = analysis.postContext.author,
+                    postText = analysis.postContext.postText,
+                    capturedAtMillis = saved.id,
                 )
                 saved.id to analysis.postContext.author
             }

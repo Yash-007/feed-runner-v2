@@ -24,6 +24,7 @@ import android.widget.Toast
 import com.yash.feedrunner.capture.AutoScrollCapture
 import com.yash.feedrunner.capture.CaptureService
 import com.yash.feedrunner.data.ReadState
+import com.yash.feedrunner.data.IdeaBankRepository
 import com.yash.feedrunner.data.ResultStore
 import com.yash.feedrunner.ui.MenuAnchor
 import com.yash.feedrunner.ui.MenuController
@@ -80,7 +81,7 @@ class BubbleService : Service() {
         windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
         resultStore = ResultStore(this)
         readState = ReadState(this)
-        analysisManager = AnalysisManager(this, resultStore)
+        analysisManager = AnalysisManager(this, resultStore, IdeaBankRepository(this))
         panelController = PanelController(
             this,
             windowManager,
