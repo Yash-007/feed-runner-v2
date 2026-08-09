@@ -623,7 +623,7 @@ class ClaudeClient(apiKey: String) {
         val seed = IdeaSeed(
             themeTags = tags,
             tension = (fields["tension"] as? String)?.trim().orEmpty(),
-            angleHint = (fields["angle_hint"] as? String)?.trim().orEmpty(),
+            angleHint = (fields["your_angle_hint"] as? String)?.trim().orEmpty(),
             shelfLife = (fields["shelf_life"] as? String)?.trim().orEmpty(),
         )
         return seed.takeUnless { it.isEmpty }
@@ -639,7 +639,8 @@ class ClaudeClient(apiKey: String) {
             "type" to "object",
             "description" to "The reusable idea behind this post, for the idea bank. " +
                 "Omit entirely unless the post raises something worth writing about " +
-                "later, independently of this reply.",
+                "later, independently of this reply. See THE IDEA SEED in the system " +
+                "prompt for when this must be null.",
             "properties" to mapOf(
                 "theme_tags" to mapOf(
                     "type" to "array",
@@ -648,16 +649,21 @@ class ClaudeClient(apiKey: String) {
                 ),
                 "tension" to mapOf(
                     "type" to "string",
-                    "description" to "The disagreement or friction worth writing into, one line.",
+                    "description" to "One line: the generalized pattern worth writing into, " +
+                        "not the anecdote, so it still reads useful weeks later without " +
+                        "the original post.",
                 ),
-                "angle_hint" to mapOf(
+                "your_angle_hint" to mapOf(
                     "type" to "string",
-                    "description" to "A direction a future post could take on this, one line.",
+                    "description" to "One line: the take Yash could build an original post " +
+                        "around, from his production view inside Indian fintech. Not a " +
+                        "repeat of the tension.",
                 ),
                 "shelf_life" to mapOf(
                     "type" to "string",
-                    "enum" to listOf("hours", "days", "weeks", "evergreen"),
-                    "description" to "How long this stays worth posting about.",
+                    "enum" to listOf("evergreen", "timely"),
+                    "description" to "timely for news and launches that rot in days, " +
+                        "evergreen for patterns that stay true.",
                 ),
             ),
         ),

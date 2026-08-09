@@ -1,6 +1,8 @@
 package com.yash.feedrunner.data
 
 import android.util.Log
+import com.yash.feedrunner.ui.ChatMessage
+import com.yash.feedrunner.ui.ChatRole
 import com.yash.feedrunner.ui.IdeaSeed
 import com.yash.feedrunner.ui.PostIdea
 import com.yash.feedrunner.ui.SeedSource
@@ -48,6 +50,20 @@ class IdeaBankApi(private val config: BackendConfig) {
     fun setStatus(remoteId: String, status: SeedStatus): StoredSeed {
         val payload = JSONObject().put("status", status.wire)
         val body = request("PATCH", "/seeds/$remoteId", payload)
+        return body.optJSONObject("seed")?.toRemoteSeed()
+            ?: throw IdeaBankException("Server did not return the seed")
+    }
+
+    /** Returns the seed with both new turns already appended by the server. */
+    fun chat(remoteId: String, message: String): StoredSeed {
+        val payload = JSONObject().put("message", message)
+        val body = request("POST", "/seeds/$remoteId/chat", payload)
+        return body.optJSONObject("seed")?.toRemoteSeed()
+            ?: throw IdeaBankException("Server did not return the conversation")
+    }
+
+    fun clearChat(remoteId: String): StoredSeed {
+        val body = request("DELETE", "/seeds/$remoteId/chat", null)
         return body.optJSONObject("seed")?.toRemoteSeed()
             ?: throw IdeaBankException("Server did not return the seed")
     }
@@ -147,8 +163,22 @@ private fun JSONObject.toRemoteSeed(): StoredSeed? = runCatching {
         postAuthor = optString("post_author"),
         postText = optString("post_text"),
         createdAtMillis = parseTimestamp(optString("created_at")),
+        chat = optJSONArray("chat").toChatMessages(),
     )
 }.getOrNull()
+
+private fun JSONArray?.toChatMessages(): List<ChatMessage> {
+    if (this == null) return emptyList()
+    return (0 until length()).mapNotNull { i ->
+        val item = optJSONObject(i) ?: return@mapNotNull null
+        val role = if (item.optString("role") == "assistant") {
+            ChatRole.ASSISTANT
+        } else {
+            ChatRole.USER
+        }
+        ChatMessage(role, item.optString("text"))
+    }
+}
 
 /**
  * Mongo timestamps come back as RFC 3339. Parsed here rather than shipped as

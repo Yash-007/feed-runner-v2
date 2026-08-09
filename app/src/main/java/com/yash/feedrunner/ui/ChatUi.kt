@@ -365,6 +365,13 @@ internal val REPLY_QUICK_PROMPTS = listOf(
     "more technical",
 )
 
+internal val SEED_QUICK_PROMPTS = listOf(
+    "turn this into a post",
+    "sharper angle",
+    "hinglish version",
+    "what's the counter take",
+)
+
 internal val POST_QUICK_PROMPTS = listOf(
     "another angle",
     "make it hinglish",

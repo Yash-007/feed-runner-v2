@@ -61,6 +61,8 @@ data class StoredSeed(
     val postAuthor: String = "",
     val postText: String = "",
     val createdAtMillis: Long = 0L,
+    /** Conversation about this seed, stored server-side so it follows the seed. */
+    val chat: List<ChatMessage> = emptyList(),
 ) {
     val isPending: Boolean get() = remoteId == null
 

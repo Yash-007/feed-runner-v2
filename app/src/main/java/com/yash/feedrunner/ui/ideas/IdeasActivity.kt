@@ -14,6 +14,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.lifecycleScope
 import com.yash.feedrunner.data.IdeaBankRepository
+import com.yash.feedrunner.ui.ChatMessage
+import com.yash.feedrunner.ui.ChatRole
 import com.yash.feedrunner.ui.PostIdea
 import com.yash.feedrunner.ui.SeedStatus
 import com.yash.feedrunner.ui.StoredSeed
@@ -32,6 +34,10 @@ data class IdeasUiState(
     val message: String? = null,
     val pendingCount: Int = 0,
     val baseUrl: String = "",
+    /** Seed whose conversation is open, if any. Only one at a time. */
+    val expandedSeedId: String? = null,
+    /** Seed waiting on a chat reply, so only that thread shows a spinner. */
+    val chatPendingId: String? = null,
 ) {
     val backendConfigured: Boolean get() = baseUrl.isNotEmpty()
 }
@@ -47,6 +53,9 @@ data class IdeasActions(
     val onSetBaseUrl: (String) -> Unit,
     val onCopy: (String) -> Unit,
     val onClearIdeas: () -> Unit,
+    val onToggleChat: (StoredSeed) -> Unit,
+    val onSendChat: (StoredSeed, String) -> Unit,
+    val onClearChat: (StoredSeed) -> Unit,
 )
 
 /**
@@ -80,6 +89,9 @@ class IdeasActivity : ComponentActivity() {
                             onSetBaseUrl = ::setBaseUrl,
                             onCopy = ::copy,
                             onClearIdeas = { state = state.copy(ideas = emptyList()) },
+                            onToggleChat = ::toggleChat,
+                            onSendChat = ::sendChat,
+                            onClearChat = ::clearChat,
                         ),
                     )
                 }
@@ -159,6 +171,56 @@ class IdeasActivity : ComponentActivity() {
                 },
                 onFailure = { toast(it.message ?: "Could not update") },
             )
+        }
+    }
+
+    private fun toggleChat(seed: StoredSeed) {
+        if (seed.remoteId == null) {
+            toast("That seed has not synced yet")
+            return
+        }
+        state = state.copy(
+            expandedSeedId = seed.remoteId.takeIf { it != state.expandedSeedId },
+        )
+    }
+
+    private fun sendChat(seed: StoredSeed, message: String) {
+        if (message.isBlank() || state.chatPendingId != null) return
+
+        // Show the typed turn straight away; the server appends both turns once
+        // the model answers, and the response replaces this optimistic copy.
+        val optimistic = seed.copy(chat = seed.chat + ChatMessage(ChatRole.USER, message))
+        state = state.copy(seeds = state.seeds.replacing(optimistic), chatPendingId = seed.remoteId)
+
+        lifecycleScope.launch {
+            val outcome = withContext(Dispatchers.IO) { repository.chat(seed, message) }
+            state = outcome.fold(
+                onSuccess = { state.copy(seeds = state.seeds.replacing(it), chatPendingId = null) },
+                onFailure = { error ->
+                    toast(error.message ?: "Chat failed")
+                    // Drop the optimistic turn: it never reached the server.
+                    state.copy(seeds = state.seeds.replacing(seed), chatPendingId = null)
+                },
+            )
+        }
+    }
+
+    private fun clearChat(seed: StoredSeed) {
+        lifecycleScope.launch {
+            val outcome = withContext(Dispatchers.IO) { repository.clearChat(seed) }
+            outcome.fold(
+                onSuccess = { state = state.copy(seeds = state.seeds.replacing(it)) },
+                onFailure = { toast(it.message ?: "Could not clear the chat") },
+            )
+        }
+    }
+
+    /** Swaps in an updated seed, matched on whichever id it has. */
+    private fun List<StoredSeed>.replacing(updated: StoredSeed): List<StoredSeed> = map { seed ->
+        if (seed.remoteId == updated.remoteId || seed.clientSeedId == updated.clientSeedId) {
+            updated
+        } else {
+            seed
         }
     }
 

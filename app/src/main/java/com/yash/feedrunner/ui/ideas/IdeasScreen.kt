@@ -41,7 +41,9 @@ import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.yash.feedrunner.ui.ChatThread
 import com.yash.feedrunner.ui.PostIdea
+import com.yash.feedrunner.ui.SEED_QUICK_PROMPTS
 import com.yash.feedrunner.ui.SeedStatus
 import com.yash.feedrunner.ui.StoredSeed
 import com.yash.feedrunner.ui.relativeAge
@@ -87,8 +89,9 @@ fun IdeasScreen(state: IdeasUiState, actions: IdeasActions) {
                 else -> SeedList(
                     seeds = state.seeds,
                     selected = state.selectedIds,
-                    onToggle = actions.onToggleSelect,
-                    onStatus = actions.onSetStatus,
+                    expandedSeedId = state.expandedSeedId,
+                    chatPendingId = state.chatPendingId,
+                    actions = actions,
                 )
             }
         }
@@ -204,8 +207,9 @@ private fun FilterChip(label: String, active: Boolean, onClick: () -> Unit) {
 private fun SeedList(
     seeds: List<StoredSeed>,
     selected: Set<String>,
-    onToggle: (StoredSeed) -> Unit,
-    onStatus: (StoredSeed, SeedStatus) -> Unit,
+    expandedSeedId: String?,
+    chatPendingId: String?,
+    actions: IdeasActions,
 ) {
     LazyColumn(
         contentPadding = androidx.compose.foundation.layout.PaddingValues(
@@ -217,8 +221,9 @@ private fun SeedList(
             SeedCard(
                 seed = seed,
                 selected = seed.remoteId in selected,
-                onToggle = { onToggle(seed) },
-                onStatus = { onStatus(seed, it) },
+                expanded = seed.remoteId != null && seed.remoteId == expandedSeedId,
+                chatPending = seed.remoteId != null && seed.remoteId == chatPendingId,
+                actions = actions,
             )
         }
     }
@@ -228,8 +233,9 @@ private fun SeedList(
 private fun SeedCard(
     seed: StoredSeed,
     selected: Boolean,
-    onToggle: () -> Unit,
-    onStatus: (SeedStatus) -> Unit,
+    expanded: Boolean,
+    chatPending: Boolean,
+    actions: IdeasActions,
 ) {
     Surface(
         shape = RoundedCornerShape(14.dp),
@@ -240,7 +246,7 @@ private fun SeedCard(
         },
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onToggle),
+            .clickable { actions.onToggleSelect(seed) },
     ) {
         Column(modifier = Modifier.padding(14.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -297,25 +303,68 @@ private fun SeedCard(
                 )
             }
 
-            // A pending seed has no server id, so there is nothing to PATCH yet.
+            // A pending seed has no server id, so there is nothing to PATCH yet
+            // and no conversation can be hung off it.
             if (!seed.isPending) {
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    modifier = Modifier.padding(top = 8.dp),
+                    modifier = Modifier
+                        .padding(top = 8.dp)
+                        .horizontalScroll(rememberScrollState()),
                 ) {
                     SeedStatus.entries.filter { it != seed.status }.forEach { status ->
-                        OutlinedButton(
-                            onClick = { onStatus(status) },
-                            contentPadding = androidx.compose.foundation.layout.PaddingValues(
-                                horizontal = 12.dp, vertical = 2.dp,
-                            ),
-                        ) {
-                            Text(text = "mark ${status.label}", fontSize = 11.sp)
+                        SmallAction(
+                            label = "mark ${status.label}",
+                            onClick = { actions.onSetStatus(seed, status) },
+                        )
+                    }
+                    SmallAction(
+                        label = when {
+                            expanded -> "hide chat"
+                            seed.chat.isEmpty() -> "chat"
+                            else -> "chat (${seed.chat.size})"
+                        },
+                        emphasised = seed.chat.isNotEmpty(),
+                        onClick = { actions.onToggleChat(seed) },
+                    )
+                }
+
+                if (expanded) {
+                    ChatThread(
+                        chat = seed.chat,
+                        pending = chatPending,
+                        quickPrompts = SEED_QUICK_PROMPTS,
+                        title = "Develop this idea",
+                        onCopyText = actions.onCopy,
+                        onSend = { actions.onSendChat(seed, it) },
+                        // Nothing to do here: unlike the overlay panels, an activity
+                        // already has window focus, so the keyboard just works.
+                        onFocusChanged = {},
+                    )
+                    if (seed.chat.isNotEmpty()) {
+                        TextButton(onClick = { actions.onClearChat(seed) }) {
+                            Text(text = "clear chat", fontSize = 11.sp)
                         }
                     }
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun SmallAction(label: String, emphasised: Boolean = false, onClick: () -> Unit) {
+    OutlinedButton(
+        onClick = onClick,
+        contentPadding = androidx.compose.foundation.layout.PaddingValues(
+            horizontal = 12.dp, vertical = 2.dp,
+        ),
+    ) {
+        Text(
+            text = label,
+            fontSize = 11.sp,
+            fontWeight = if (emphasised) FontWeight.SemiBold else FontWeight.Normal,
+        )
     }
 }
 

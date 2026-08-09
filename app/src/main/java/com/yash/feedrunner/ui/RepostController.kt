@@ -163,13 +163,12 @@ class RepostController(
                         )
                         store.save(result)
                         // First generation for this capture only; refinements and
-                        // chat never come through here.
+                        // chat never come through here. Quote mode only: in post
+                        // mode the capture is already Yash's own output, so the
+                        // prompt returns null and a seed would mean it misread.
                         ideaBank.record(
-                            seed = analysis.ideaSeed,
-                            source = when (requestedMode) {
-                                RepostMode.POST -> SeedSource.POST
-                                RepostMode.QUOTE -> SeedSource.QUOTE
-                            },
+                            seed = analysis.ideaSeed.takeIf { requestedMode == RepostMode.QUOTE },
+                            source = SeedSource.QUOTE,
                             clientSeedId = "${requestedMode.wire}-${result.savedAtMillis}",
                             postAuthor = analysis.capture.quotedAuthor.orEmpty(),
                             postText = analysis.capture.summary,

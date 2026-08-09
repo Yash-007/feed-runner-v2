@@ -139,6 +139,22 @@ class IdeaBankRepository(context: Context) {
         return runCatching { api.deleteSeed(id) }
     }
 
+    /**
+     * Sends a chat turn about a seed. Needs the backend: a seed still in the
+     * outbox has no server id to hang a conversation off.
+     */
+    fun chat(seed: StoredSeed, message: String): Result<StoredSeed> {
+        val id = seed.remoteId
+            ?: return Result.failure(IdeaBankException("Not synced yet, needs the backend"))
+        return runCatching { api.chat(id, message) }
+    }
+
+    fun clearChat(seed: StoredSeed): Result<StoredSeed> {
+        val id = seed.remoteId
+            ?: return Result.failure(IdeaBankException("Not synced yet, needs the backend"))
+        return runCatching { api.clearChat(id) }
+    }
+
     fun generateIdeas(seeds: List<StoredSeed>, steer: String): Result<List<PostIdea>> {
         val ids = seeds.mapNotNull { it.remoteId }
         if (ids.isEmpty()) {
