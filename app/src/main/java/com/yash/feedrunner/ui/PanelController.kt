@@ -165,6 +165,7 @@ class PanelController(
                 ReplyPanel(
                     state = state,
                     onDraftCopy = ::copyDraft,
+                    onToggleUsed = ::toggleUsed,
                     onRefine = ::refineDraft,
                     onSelectResult = ::selectResult,
                     onSendChat = ::sendChat,
@@ -283,9 +284,24 @@ class PanelController(
     private fun copyDraft(draft: Draft) {
         val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
         clipboard.setPrimaryClip(ClipData.newPlainText("reply", draft.text))
+        // Copying is the closest thing to "I sent this" that the app can observe,
+        // so it doubles as the used marker.
+        setUsed(draft, used = true)
         // Deliberately does not dismiss: copying one draft is often followed by
         // copying another, or by carrying on the chat.
     }
+
+    /** Flips the used marker and writes it through, so a reopen still shows it. */
+    private fun setUsed(draft: Draft, used: Boolean) {
+        val ready = state as? PanelState.Ready ?: return
+        if (ready.drafts.none { it.id == draft.id }) return
+
+        val updated = ready.drafts.map { if (it.id == draft.id) it.copy(used = used) else it }
+        state = ready.copy(drafts = updated)
+        currentResultId?.let { resultStore.updateDrafts(it, updated) }
+    }
+
+    private fun toggleUsed(draft: Draft) = setUsed(draft, used = !draft.used)
 
     private companion object {
         const val TAG = "PanelController"

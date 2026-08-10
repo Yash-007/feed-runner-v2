@@ -132,6 +132,7 @@ class ResultStore(private val context: Context) {
                 angle = angle,
                 thought = item.optString("thought"),
                 text = item.getString("text"),
+                used = item.optBoolean("used"),
             )
         }
         if (drafts.isEmpty()) return@runCatching null
@@ -194,6 +195,7 @@ class ResultStore(private val context: Context) {
                     put("angle", draft.angle.name)
                     put("thought", draft.thought)
                     put("text", draft.text)
+                    put("used", draft.used)
                 },
             )
         }

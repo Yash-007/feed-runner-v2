@@ -77,6 +77,7 @@ private val PanelShape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp)
 fun ReplyPanel(
     state: PanelState,
     onDraftCopy: (Draft) -> Unit,
+    onToggleUsed: (Draft) -> Unit,
     onRefine: (Draft, Refinement) -> Unit,
     onSelectResult: (savedAtMillis: Long) -> Unit,
     onSendChat: (String) -> Unit,
@@ -125,6 +126,7 @@ fun ReplyPanel(
                     is PanelState.Ready -> ReadyBody(
                         state = state,
                         onDraftCopy = onDraftCopy,
+                        onToggleUsed = onToggleUsed,
                         onRefine = onRefine,
                         onSelectResult = onSelectResult,
                         onViewCapture = { viewerPath = it },
@@ -204,6 +206,7 @@ private fun ErrorBody(message: String, onRetry: () -> Unit) {
 private fun ReadyBody(
     state: PanelState.Ready,
     onDraftCopy: (Draft) -> Unit,
+    onToggleUsed: (Draft) -> Unit,
     onRefine: (Draft, Refinement) -> Unit,
     onSelectResult: (savedAtMillis: Long) -> Unit,
     onViewCapture: (path: String) -> Unit,
@@ -227,59 +230,123 @@ private fun ReadyBody(
 
     onScrollState(scrollState)
 
-    Column(
-        modifier = Modifier.verticalScroll(scrollState),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        (state.source as? ResultSource.Cached)?.let { cached ->
-            HistoryStrip(
-                history = state.history,
-                selectedId = cached.savedAtMillis,
-                onSelect = onSelectResult,
-            )
+    // Which draft last got copied, so the confirmation lands on that card rather
+    // than as a toast that covers the next one.
+    var copiedId by remember(resultKey) { mutableIntStateOf(-1) }
+    LaunchedEffect(copiedId) {
+        if (copiedId >= 0) {
+            delay(COPIED_HINT_MS)
+            copiedId = -1
         }
-        PostContextBlock(
-            context = state.postContext,
-            thumbnailPath = state.thumbnailPath,
-            capturePath = state.capturePath,
-            onViewCapture = onViewCapture,
-        )
-        // Which draft last got copied, so the confirmation lands on that card
-        // rather than as a toast that covers the next one.
-        var copiedId by remember(resultKey) { mutableIntStateOf(-1) }
-        LaunchedEffect(copiedId) {
-            if (copiedId >= 0) {
-                delay(COPIED_HINT_MS)
-                copiedId = -1
+    }
+
+    val scope = rememberCoroutineScope()
+
+    Box {
+        Column(
+            modifier = Modifier.verticalScroll(scrollState),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            (state.source as? ResultSource.Cached)?.let { cached ->
+                HistoryStrip(
+                    history = state.history,
+                    selectedId = cached.savedAtMillis,
+                    onSelect = onSelectResult,
+                )
             }
+            PostContextBlock(
+                context = state.postContext,
+                thumbnailPath = state.thumbnailPath,
+                capturePath = state.capturePath,
+                onViewCapture = onViewCapture,
+            )
+
+            state.drafts.forEach { draft ->
+                DraftCard(
+                    draft = draft,
+                    refinements = refinements,
+                    copied = copiedId == draft.id,
+                    onCopy = {
+                        onDraftCopy(draft)
+                        copiedId = draft.id
+                    },
+                    onToggleUsed = { onToggleUsed(draft) },
+                    onRefine = { refinement -> onRefine(draft, refinement) },
+                )
+            }
+
+            Text(
+                text = "Tap a draft to copy it. The panel stays open.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            ChatThread(
+                chat = state.chat,
+                pending = state.chatPending,
+                quickPrompts = REPLY_QUICK_PROMPTS,
+                title = "Ask for anything else",
+                onCopyText = onCopyText,
+                onSend = onSendChat,
+                onFocusChanged = onChatFocusChanged,
+            )
         }
 
-        state.drafts.forEach { draft ->
-            DraftCard(
-                draft = draft,
-                refinements = refinements,
-                copied = copiedId == draft.id,
-                onCopy = {
-                    onDraftCopy(draft)
-                    copiedId = draft.id
-                },
-                onRefine = { refinement -> onRefine(draft, refinement) },
+        // Once the post scrolls away there is nothing on screen saying who you are
+        // replying to, which is easy to lose track of with several results saved.
+        AnimatedVisibility(
+            visible = scrollState.value > STICKY_HEADER_AFTER_PX,
+            enter = fadeIn(),
+            exit = fadeOut(),
+            modifier = Modifier.align(Alignment.TopCenter),
+        ) {
+            StickyContextBar(
+                context = state.postContext,
+                onTap = { scope.launch { scrollState.animateScrollTo(0) } },
             )
         }
-        Text(
-            text = "Tap a draft to copy it. The panel stays open.",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        ChatThread(
-            chat = state.chat,
-            pending = state.chatPending,
-            quickPrompts = REPLY_QUICK_PROMPTS,
-            title = "Ask for anything else",
-            onCopyText = onCopyText,
-            onSend = onSendChat,
-            onFocusChanged = onChatFocusChanged,
-        )
+    }
+}
+
+/**
+ * Condensed stand-in for the post context, overlaid while the real one is scrolled
+ * out of view. Tapping it returns to the top rather than being decoration.
+ */
+@Composable
+private fun StickyContextBar(context: PostContext, onTap: () -> Unit) {
+    Surface(
+        color = MaterialTheme.colorScheme.surface,
+        tonalElevation = 6.dp,
+        shadowElevation = 3.dp,
+        shape = RoundedCornerShape(12.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onTap),
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp),
+        ) {
+            Text(
+                text = context.author,
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f, fill = false),
+            )
+            Text(
+                text = " · ${context.registerLabel}",
+                style = MetaTextStyle,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+            )
+            Box(modifier = Modifier.weight(1f))
+            Text(
+                text = "↑ top",
+                style = MetaTextStyle,
+                color = MaterialTheme.colorScheme.primary,
+            )
+        }
     }
 }
 
@@ -468,9 +535,12 @@ private fun DraftCard(
     refinements: List<Refinement>,
     copied: Boolean,
     onCopy: () -> Unit,
+    onToggleUsed: () -> Unit,
     onRefine: (Refinement) -> Unit,
 ) {
     val haptics = LocalHapticFeedback.current
+    // Per card, so opening the chips on one draft does not shuffle the others.
+    var showRefinements by remember { mutableStateOf(false) }
     Card(
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
@@ -491,7 +561,7 @@ private fun DraftCard(
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier
                             .padding(start = 7.dp)
-                            .weight(1f, fill = false),
+                            .weight(1f),
                     )
                 }
                 if (draft.refining) {
@@ -502,6 +572,7 @@ private fun DraftCard(
                         strokeWidth = 2.dp,
                     )
                 }
+                UsedMarker(used = draft.used, onClick = onToggleUsed)
             }
 
             Text(
@@ -527,20 +598,68 @@ private fun DraftCard(
                 )
             }
 
-            Row(
+            Text(
+                text = if (showRefinements) "refine ▴" else "refine ▾",
+                style = MetaTextStyle,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.primary,
                 modifier = Modifier
-                    .padding(top = 10.dp)
-                    .horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-            ) {
-                refinements.forEach { refinement ->
-                    RefinementChip(
-                        label = refinement.label,
-                        enabled = !draft.refining,
-                        onClick = { onRefine(refinement) },
-                    )
+                    .padding(top = 6.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .clickable { showRefinements = !showRefinements }
+                    .padding(horizontal = 6.dp, vertical = 4.dp),
+            )
+
+            AnimatedVisibility(visible = showRefinements || draft.refining) {
+                Row(
+                    modifier = Modifier
+                        .padding(top = 4.dp)
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    refinements.forEach { refinement ->
+                        RefinementChip(
+                            label = refinement.label,
+                            enabled = !draft.refining,
+                            onClick = { onRefine(refinement) },
+                        )
+                    }
                 }
             }
+        }
+    }
+}
+
+/**
+ * Marks a draft as the one you sent. Copying sets it automatically, so the tap here
+ * is mostly for undoing that, or for a draft you sent without copying.
+ */
+@Composable
+private fun UsedMarker(used: Boolean, onClick: () -> Unit) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .clip(RoundedCornerShape(9.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 6.dp, vertical = 3.dp),
+    ) {
+        Text(
+            text = "✓",
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Bold,
+            color = if (used) {
+                UsedGreen
+            } else {
+                MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.35f)
+            },
+        )
+        if (used) {
+            Text(
+                text = " used",
+                style = MetaTextStyle,
+                fontWeight = FontWeight.SemiBold,
+                color = UsedGreen,
+            )
         }
     }
 }
@@ -573,3 +692,9 @@ private fun RefinementChip(label: String, enabled: Boolean, onClick: () -> Unit)
             .padding(horizontal = 12.dp, vertical = 6.dp),
     )
 }
+
+/** Roughly the height of the history strip plus the post block. */
+private const val STICKY_HEADER_AFTER_PX = 220
+
+/** Same green as a posted seed, so "done with this" looks the same everywhere. */
+private val UsedGreen = Color(0xFF00BA7C)

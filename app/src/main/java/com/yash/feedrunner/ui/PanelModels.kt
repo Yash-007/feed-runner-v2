@@ -80,6 +80,12 @@ data class Draft(
     val text: String,
     /** True while a refinement request for this draft is in flight. */
     val refining: Boolean = false,
+    /**
+     * Set once you copy a draft, and persisted, so reopening a result shows which
+     * one you actually sent. Copying is the only signal available: the app never
+     * sees the post go out.
+     */
+    val used: Boolean = false,
 )
 
 enum class ChatRole { USER, ASSISTANT }
