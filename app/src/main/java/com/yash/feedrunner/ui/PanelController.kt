@@ -63,6 +63,9 @@ class PanelController(
     /** Which stored result is on screen, so refinements update the right one. */
     private var currentResultId: Long? = null
 
+    /** Kept so a failed chat turn can be retried without retyping it. */
+    private var lastChatMessage: String? = null
+
     /** Bumped on every dismiss so a late response can't write into a closed panel. */
     private var generation = 0
 
@@ -169,6 +172,7 @@ class PanelController(
                     onRefine = ::refineDraft,
                     onSelectResult = ::selectResult,
                     onSendChat = ::sendChat,
+                    onRetryChat = ::retryChat,
                     onCopyText = ::copyText,
                     onChatFocusChanged = window::setFocusable,
                     onRetry = ::dismiss,
@@ -226,10 +230,14 @@ class PanelController(
 
         val history = ready.chat
         val withUserTurn = history + ChatMessage(ChatRole.USER, message)
-        state = ready.copy(chat = withUserTurn, chatPending = true)
-        currentResultId?.let { resultStore.updateChat(it, withUserTurn) }
+        state = ready.copy(chat = withUserTurn, chatPending = true, chatError = null)
 
-        val requestGeneration = generation
+        // Captured now: the panel can be closed and a different result selected
+        // before this lands, and the reply belongs to the result it was asked about.
+        val resultId = currentResultId
+        resultId?.let { resultStore.updateChat(it, withUserTurn) }
+        lastChatMessage = message
+
         val voiceRules = voiceRulesStore.rules
         val drafts = ready.drafts
 
@@ -245,21 +253,45 @@ class PanelController(
             }
 
             handler.post {
-                if (requestGeneration != generation) return@post
-                val current = state as? PanelState.Ready ?: return@post
                 result
                     .onSuccess { reply ->
-                        val withReply = current.chat + ChatMessage(ChatRole.ASSISTANT, reply)
-                        state = current.copy(chat = withReply, chatPending = false)
-                        currentResultId?.let { resultStore.updateChat(it, withReply) }
+                        val withReply = withUserTurn + ChatMessage(ChatRole.ASSISTANT, reply)
+                        // Written through first, unconditionally. Gating this on the
+                        // panel still being open lost answers whenever the sheet was
+                        // closed mid-request, and lost them permanently.
+                        resultId?.let { resultStore.updateChat(it, withReply) }
+
+                        val current = state as? PanelState.Ready
+                        if (current != null && currentResultId == resultId) {
+                            state = current.copy(chat = withReply, chatPending = false)
+                        }
                     }
                     .onFailure { error ->
                         Log.w(TAG, "Chat failed", error)
-                        state = current.copy(chatPending = false)
-                        Toast.makeText(context, userMessage(error), Toast.LENGTH_SHORT).show()
+                        val current = state as? PanelState.Ready
+                        if (current != null && currentResultId == resultId) {
+                            // Shown in the thread rather than as a toast: a toast
+                            // over someone else's app is easy to miss entirely,
+                            // which read as the answer never arriving.
+                            state = current.copy(
+                                chatPending = false,
+                                chatError = userMessage(error),
+                            )
+                        }
                     }
             }
         }
+    }
+
+    /** Re-sends the last chat turn after a failure, dropping the failed user turn. */
+    private fun retryChat() {
+        val message = lastChatMessage ?: return
+        val ready = state as? PanelState.Ready ?: return
+        // Drop the user turn the failed attempt added, so the retry does not
+        // duplicate it in the history sent to the model.
+        val trimmed = ready.chat.dropLastWhile { it.role == ChatRole.USER }
+        state = ready.copy(chat = trimmed, chatError = null)
+        sendChat(message)
     }
 
     private fun userMessage(error: Throwable): String = when (error) {

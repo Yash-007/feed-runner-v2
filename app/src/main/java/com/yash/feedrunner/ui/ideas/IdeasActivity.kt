@@ -45,6 +45,9 @@ data class IdeasUiState(
     /** Card with its conversation open. Always also expanded. */
     val chatSeedKey: String? = null,
     val chatPendingId: String? = null,
+    /** Failed chat turn, scoped to the seed it belongs to. */
+    val chatError: String? = null,
+    val chatErrorId: String? = null,
     /** Null until the first load answers either way. */
     val serverReachable: Boolean? = null,
     val pendingDelete: StoredSeed? = null,
@@ -84,6 +87,7 @@ data class IdeasActions(
     val onClearIdeas: () -> Unit,
     val onToggleChat: (StoredSeed) -> Unit,
     val onSendChat: (StoredSeed, String) -> Unit,
+    val onRetryChat: (StoredSeed) -> Unit,
     val onAskDelete: (StoredSeed) -> Unit,
     val onConfirmDelete: (StoredSeed) -> Unit,
     val onCancelDelete: () -> Unit,
@@ -99,6 +103,9 @@ class IdeasActivity : ComponentActivity() {
 
     private lateinit var repository: IdeaBankRepository
     private var state by mutableStateOf(IdeasUiState())
+
+    /** Kept so a failed chat turn can be retried without retyping it. */
+    private var lastChatMessage: String? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -129,6 +136,7 @@ class IdeasActivity : ComponentActivity() {
                             onClearIdeas = { state = state.copy(ideas = emptyList()) },
                             onToggleChat = ::toggleChat,
                             onSendChat = ::sendChat,
+                            onRetryChat = ::retryChat,
                             onAskDelete = { state = state.copy(pendingDelete = it) },
                             onConfirmDelete = ::delete,
                             onCancelDelete = { state = state.copy(pendingDelete = null) },
@@ -250,20 +258,37 @@ class IdeasActivity : ComponentActivity() {
 
         // Show the typed turn straight away; the server appends both turns once
         // the model answers, and the response replaces this optimistic copy.
+        lastChatMessage = message
         val optimistic = seed.copy(chat = seed.chat + ChatMessage(ChatRole.USER, message))
-        state = state.copy(seeds = state.seeds.replacing(optimistic), chatPendingId = seed.remoteId)
+        state = state.copy(
+            seeds = state.seeds.replacing(optimistic),
+            chatPendingId = seed.remoteId,
+            chatError = null,
+            chatErrorId = null,
+        )
 
         lifecycleScope.launch {
             val outcome = withContext(Dispatchers.IO) { repository.chat(seed, message) }
             state = outcome.fold(
                 onSuccess = { state.copy(seeds = state.seeds.replacing(it), chatPendingId = null) },
                 onFailure = { error ->
-                    toast(error.message ?: "Chat failed")
-                    // Drop the optimistic turn: it never reached the server.
-                    state.copy(seeds = state.seeds.replacing(seed), chatPendingId = null)
+                    // Drop the optimistic turn, it never reached the server, and
+                    // show the failure on the card rather than as a toast.
+                    state.copy(
+                        seeds = state.seeds.replacing(seed),
+                        chatPendingId = null,
+                        chatError = error.message ?: "Chat failed",
+                        chatErrorId = seed.remoteId,
+                    )
                 },
             )
         }
+    }
+
+    private fun retryChat(seed: StoredSeed) {
+        val message = lastChatMessage ?: return
+        state = state.copy(chatError = null, chatErrorId = null)
+        sendChat(seed, message)
     }
 
     /** Swaps in an updated seed, matched on whichever id it has. */

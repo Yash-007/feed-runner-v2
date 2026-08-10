@@ -108,7 +108,9 @@ class BubbleService : Service() {
             onCapture = ::startSingleCapture,
             onHold = ::startAutoCapture,
             onRepost = ::startRepostCapture,
-            repostDraftsAge = { repostController.heldResultAge },
+            repostDraftsAge = { repostController.heldResultAge.takeIf { _ ->
+                repostController.hasUnseenResult
+            } },
             onLastResult = { panelController.showLastResult() },
         )
         startForeground(NOTIFICATION_ID, buildNotification())
@@ -284,7 +286,10 @@ class BubbleService : Service() {
      * is never stranded.
      */
     private fun startRepostCapture() {
-        if (repostController.hasHeldResult) {
+        // Only an unseen hand-off pre-empts a capture. Older drafts are offered
+        // inside the composer instead, so Repost always means "caption what I am
+        // looking at now".
+        if (repostController.hasUnseenResult) {
             repostController.showHeldResult()
             return
         }

@@ -81,6 +81,7 @@ fun ReplyPanel(
     onRefine: (Draft, Refinement) -> Unit,
     onSelectResult: (savedAtMillis: Long) -> Unit,
     onSendChat: (String) -> Unit,
+    onRetryChat: () -> Unit,
     onCopyText: (String) -> Unit,
     onChatFocusChanged: (Boolean) -> Unit,
     onRetry: () -> Unit,
@@ -131,6 +132,7 @@ fun ReplyPanel(
                         onSelectResult = onSelectResult,
                         onViewCapture = { viewerPath = it },
                         onSendChat = onSendChat,
+                        onRetryChat = onRetryChat,
                         onCopyText = onCopyText,
                         onChatFocusChanged = { focused ->
                             chatFocused = focused
@@ -211,6 +213,7 @@ private fun ReadyBody(
     onSelectResult: (savedAtMillis: Long) -> Unit,
     onViewCapture: (path: String) -> Unit,
     onSendChat: (String) -> Unit,
+    onRetryChat: () -> Unit,
     onCopyText: (String) -> Unit,
     onChatFocusChanged: (Boolean) -> Unit,
     onScrollState: (ScrollState) -> Unit,
@@ -285,8 +288,10 @@ private fun ReadyBody(
                 pending = state.chatPending,
                 quickPrompts = REPLY_QUICK_PROMPTS,
                 title = "Ask for anything else",
+                error = state.chatError,
                 onCopyText = onCopyText,
                 onSend = onSendChat,
+                onRetry = onRetryChat,
                 onFocusChanged = onChatFocusChanged,
             )
         }

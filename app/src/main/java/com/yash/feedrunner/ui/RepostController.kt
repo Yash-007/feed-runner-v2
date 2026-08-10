@@ -62,9 +62,24 @@ class RepostController(
      */
     private var heldResult: RepostResult? = store.load()
 
+    /**
+     * True only for a result that landed while the sheet was closed and has not
+     * been looked at yet.
+     *
+     * Without this the stored result made Repost permanently mean "reopen": every
+     * tap showed the old drafts and a new capture became impossible. Capture is the
+     * primary action, so anything older than an unseen hand-off is reachable from
+     * the composer instead.
+     */
+    private var heldUnseen = false
+
+    /** Kept so a failed chat turn can be retried without retyping it. */
+    private var lastChatMessage: String? = null
+
     val isShowing: Boolean get() = window.isShowing
 
-    val hasHeldResult: Boolean get() = heldResult != null
+    /** Only an unseen hand-off should pre-empt a fresh capture. */
+    val hasUnseenResult: Boolean get() = heldUnseen && heldResult != null
 
     /** How long ago the held drafts were generated, for the menu subtitle. */
     val heldResultAge: String? get() = heldResult?.let { relativeAge(it.savedAtMillis) }
@@ -75,13 +90,13 @@ class RepostController(
         screenshot.recycle()
         state = RepostState.Composing
         userText = ""
-        heldResult = null
         open()
     }
 
     /** Reopens drafts that finished while the sheet was closed. No new API call. */
     fun showHeldResult() {
         val held = heldResult ?: return
+        heldUnseen = false
         mode = held.mode
         capturePath = held.capturePath
         state = RepostState.Ready(held)
@@ -113,6 +128,11 @@ class RepostController(
                     onGenerate = ::generate,
                     onCopyText = ::copyText,
                     onSendChat = ::sendChat,
+                    onRetryChat = ::retryChat,
+                    heldDraftsAge = heldResult
+                        ?.takeIf { state is RepostState.Composing }
+                        ?.let { relativeAge(it.savedAtMillis) },
+                    onOpenHeldDrafts = ::showHeldResult,
                     onFocusChanged = window::setFocusable,
                     onDismiss = ::dismiss,
                 )
@@ -179,6 +199,7 @@ class RepostController(
                             state = RepostState.Ready(result)
                         } else {
                             // Closed mid-flight: hold it rather than throw it away.
+                            heldUnseen = true
                             Toast.makeText(
                                 context,
                                 "${requestedMode.label} drafts ready, tap Repost to see them",
@@ -217,6 +238,7 @@ class RepostController(
         val result = ready.result
         val history = result.chat
         val withUserTurn = history + ChatMessage(ChatRole.USER, message)
+        lastChatMessage = message
         state = RepostState.Ready(result.copy(chat = withUserTurn), chatPending = true)
         heldResult = result.copy(chat = withUserTurn)
         store.updateChat(result.savedAtMillis, withUserTurn)
@@ -252,14 +274,26 @@ class RepostController(
                         Log.w(TAG, "Post chat failed", error)
                         val current = state as? RepostState.Ready
                         if (current?.result?.savedAtMillis == result.savedAtMillis) {
-                            state = current.copy(chatPending = false)
+                            // In the thread, not a toast: a toast over another app
+                            // is easy to miss, which reads as no answer arriving.
+                            state = current.copy(
+                                chatPending = false,
+                                chatError = (error as? ClaudeException)?.message
+                                    ?: "Chat failed. Check your connection.",
+                            )
                         }
-                        val message = (error as? ClaudeException)?.message
-                            ?: "Chat failed. Check your connection."
-                        Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
                     }
             }
         }
+    }
+
+    /** Re-sends the last chat turn after a failure, dropping the failed user turn. */
+    private fun retryChat() {
+        val message = lastChatMessage ?: return
+        val ready = state as? RepostState.Ready ?: return
+        val trimmed = ready.result.chat.dropLastWhile { it.role == ChatRole.USER }
+        state = RepostState.Ready(ready.result.copy(chat = trimmed), chatError = null)
+        sendChat(message)
     }
 
     private fun copyText(text: String) {

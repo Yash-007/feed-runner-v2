@@ -297,7 +297,7 @@ class ClaudeClient(apiKey: String) {
             ?.text()
             ?.trim()
 
-        if (text.isNullOrBlank()) throw ClaudeException("Empty reply. Try again.")
+        if (text.isNullOrBlank()) throw ClaudeException("No answer came back. Tap retry.")
         return scrubTells(text)
     }
 
@@ -338,7 +338,12 @@ class ClaudeClient(apiKey: String) {
                     .build(),
             )
         }
-        add(MessageParam.builder().role(MessageParam.Role.USER).content(userMessage).build())
+        add(
+            MessageParam.builder()
+                .role(MessageParam.Role.USER)
+                .content(userMessage + "\n" + PLAIN_TEXT_NOTE)
+                .build(),
+        )
     }
 
     private fun parseRepost(fields: Map<String, Any?>): RepostAnalysis {

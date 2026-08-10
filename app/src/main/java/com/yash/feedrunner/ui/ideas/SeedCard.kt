@@ -60,6 +60,7 @@ internal fun SeedCard(
     expanded: Boolean,
     chatOpen: Boolean,
     chatPending: Boolean,
+    chatError: String?,
     actions: IdeasActions,
 ) {
     Surface(
@@ -198,8 +199,10 @@ internal fun SeedCard(
                             pending = chatPending,
                             quickPrompts = SEED_QUICK_PROMPTS,
                             title = "Develop this idea",
+                            error = chatError,
                             onCopyText = actions.onCopy,
                             onSend = { actions.onSendChat(seed, it) },
+                            onRetry = { actions.onRetryChat(seed) },
                             // An activity already holds window focus, unlike the
                             // overlay panels that have to ask for it.
                             onFocusChanged = {},

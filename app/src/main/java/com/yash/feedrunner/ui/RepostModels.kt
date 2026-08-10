@@ -70,6 +70,8 @@ sealed interface RepostState {
     data class Ready(
         val result: RepostResult,
         val chatPending: Boolean = false,
+        /** Set when a chat turn failed, shown in the thread with a retry. */
+        val chatError: String? = null,
     ) : RepostState
 
     data class Error(val message: String) : RepostState

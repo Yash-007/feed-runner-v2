@@ -84,6 +84,9 @@ fun RepostPanel(
     onGenerate: () -> Unit,
     onCopyText: (String) -> Unit,
     onSendChat: (String) -> Unit,
+    onRetryChat: () -> Unit,
+    heldDraftsAge: String?,
+    onOpenHeldDrafts: () -> Unit,
     onFocusChanged: (Boolean) -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -151,6 +154,10 @@ fun RepostPanel(
                         TextButton(onClick = onDismiss) { Text("Close") }
                     }
 
+                    if (heldDraftsAge != null) {
+                        HeldDraftsBanner(age = heldDraftsAge, onOpen = onOpenHeldDrafts)
+                    }
+
                     // Once drafts exist the composer has done its job, and leaving
                     // it expanded pushes the drafts you came for below the fold.
                     // It collapses to a brief you can reopen to change and rerun.
@@ -198,8 +205,10 @@ fun RepostPanel(
                                 pending = state.chatPending,
                                 quickPrompts = POST_QUICK_PROMPTS,
                                 title = "Ask for a different ${state.result.mode.label.lowercase()}",
+                                error = state.chatError,
                                 onCopyText = onCopyText,
                                 onSend = onSendChat,
+                                onRetry = onRetryChat,
                                 onFocusChanged = trackFocus,
                             )
                         }
@@ -218,6 +227,40 @@ fun RepostPanel(
         viewerPath?.let { path ->
             CaptureViewer(path = path, onDismiss = { viewerPath = null })
         }
+    }
+}
+
+/**
+ * Way back to the last generation, shown only on a fresh capture.
+ *
+ * Repost used to reopen these automatically, which meant a new capture was
+ * impossible once anything was stored. Offering them here keeps them one tap away
+ * without hijacking the button.
+ */
+@Composable
+private fun HeldDraftsBanner(age: String, onOpen: () -> Unit) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 10.dp)
+            .clip(RoundedCornerShape(10.dp))
+            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.10f))
+            .clickable(onClick = onOpen)
+            .padding(horizontal = 10.dp, vertical = 8.dp),
+    ) {
+        Text(
+            text = "Last drafts from $age",
+            style = MetaTextStyle,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.weight(1f),
+        )
+        Text(
+            text = "open",
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.primary,
+        )
     }
 }
 

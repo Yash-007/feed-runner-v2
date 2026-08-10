@@ -63,12 +63,13 @@ internal fun ChatThread(
     pending: Boolean,
     quickPrompts: List<String>,
     title: String,
+    error: String?,
     onCopyText: (String) -> Unit,
     onSend: (String) -> Unit,
+    onRetry: () -> Unit,
     onFocusChanged: (Boolean) -> Unit,
 ) {
     var input by remember { mutableStateOf("") }
-    var selectingIndex by remember { mutableIntStateOf(-1) }
     var copiedIndex by remember { mutableIntStateOf(-1) }
 
     // The "copied" marker is transient; clear it without the caller having to.
@@ -94,7 +95,7 @@ internal fun ChatThread(
             )
             if (chat.isNotEmpty()) {
                 Text(
-                    text = "tap to copy · hold to select",
+                    text = "tap to copy · long press to select",
                     fontSize = 9.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -105,21 +106,31 @@ internal fun ChatThread(
             QuickPrompts(prompts = quickPrompts, onPick = onSend)
         }
 
-        chat.forEachIndexed { index, message ->
-            ChatBubble(
-                message = message,
-                selecting = selectingIndex == index,
-                copied = copiedIndex == index,
-                onCopy = {
-                    onCopyText(message.text)
-                    copiedIndex = index
-                    selectingIndex = -1
-                },
-                onLongPress = { selectingIndex = index },
-            )
+        // One container around the whole conversation, so a long press starts a
+        // normal Android selection with handles and the Copy / Select all toolbar,
+        // and a selection can run across messages. The previous per-bubble version
+        // needed one long press to arm selection and a second to begin it, which is
+        // what made selecting text feel broken.
+        SelectionActionsHost {
+            SelectionContainer {
+                Column {
+                    chat.forEachIndexed { index, message ->
+                        ChatBubble(
+                            message = message,
+                            copied = copiedIndex == index,
+                            onCopy = {
+                                onCopyText(message.text)
+                                copiedIndex = index
+                            },
+                        )
+                    }
+                }
+            }
         }
 
         if (pending) TypingIndicator()
+
+        error?.let { ChatError(message = it, onRetry = onRetry) }
 
         ChatInput(
             value = input,
@@ -130,6 +141,42 @@ internal fun ChatThread(
                 onSend(input.trim())
                 input = ""
             },
+        )
+    }
+}
+
+/**
+ * A failed turn, in the thread where it happened.
+ *
+ * This used to be a toast. Over someone else's app a toast is easy to miss, and
+ * missing it looks exactly like the answer never arriving.
+ */
+@Composable
+private fun ChatError(message: String, onRetry: () -> Unit) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 6.dp)
+            .clip(RoundedCornerShape(10.dp))
+            .background(MaterialTheme.colorScheme.error.copy(alpha = 0.12f))
+            .padding(horizontal = 12.dp, vertical = 9.dp),
+    ) {
+        Text(
+            text = message,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.error,
+            modifier = Modifier.weight(1f),
+        )
+        Text(
+            text = "retry",
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.error,
+            modifier = Modifier
+                .clip(RoundedCornerShape(8.dp))
+                .clickable(onClick = onRetry)
+                .padding(horizontal = 8.dp, vertical = 4.dp),
         )
     }
 }
@@ -209,10 +256,8 @@ private fun TypingIndicator() {
 @Composable
 private fun ChatBubble(
     message: ChatMessage,
-    selecting: Boolean,
     copied: Boolean,
     onCopy: () -> Unit,
-    onLongPress: () -> Unit,
 ) {
     val fromUser = message.role == ChatRole.USER
     val haptics = LocalHapticFeedback.current
@@ -233,47 +278,31 @@ private fun ChatBubble(
     ) {
         Surface(
             shape = shape,
-            color = when {
-                fromUser -> MaterialTheme.colorScheme.primary.copy(alpha = 0.13f)
-                selecting -> MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)
-                else -> MaterialTheme.colorScheme.surfaceVariant
-            },
-            border = if (selecting) {
-                BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.5f))
+            color = if (fromUser) {
+                MaterialTheme.colorScheme.primary.copy(alpha = 0.13f)
             } else {
-                null
+                MaterialTheme.colorScheme.surfaceVariant
             },
             modifier = Modifier.widthIn(max = 300.dp),
         ) {
-            val body = @Composable {
-                Text(
-                    text = message.text,
-                    style = MaterialTheme.typography.bodyMedium,
-                    modifier = Modifier.padding(horizontal = 13.dp, vertical = 10.dp),
-                )
-            }
-
-            if (selecting) {
-                // Handles need a selection container; taps are disabled here so
-                // dragging a handle can't be mistaken for a copy.
-                SelectionContainer { body() }
-            } else {
-                Box(
-                    modifier = Modifier.combinedClickable(
-                        enabled = !fromUser,
-                        onClick = onCopy,
-                        onLongClick = {
-                            haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                            onLongPress()
-                        },
-                    ),
-                ) { body() }
-            }
+            // Tap copies, on your own messages too: rereading something you asked
+            // and wanting it back is as common as wanting the answer. Long press is
+            // deliberately not handled here so it reaches the selection container.
+            Text(
+                text = message.text,
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier
+                    .clickable {
+                        haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        onCopy()
+                    }
+                    .padding(horizontal = 13.dp, vertical = 10.dp),
+            )
         }
 
-        if (copied || selecting) {
+        if (copied) {
             Text(
-                text = if (copied) "copied" else "select, then tap a draft to exit",
+                text = "copied",
                 fontSize = 9.sp,
                 color = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.padding(top = 3.dp, start = 4.dp, end = 4.dp),

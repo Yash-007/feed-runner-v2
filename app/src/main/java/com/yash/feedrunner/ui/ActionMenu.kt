@@ -130,7 +130,7 @@ fun ActionMenu(
                 glyph = "⇄",
                 accent = RepostColor,
                 title = "Repost",
-                subtitle = repostDraftsAge?.let { "drafts · $it" } ?: "Caption this post",
+                subtitle = repostDraftsAge?.let { "drafts ready · $it" } ?: "Caption this post",
                 onClick = onRepost,
             )
             ActionPill(

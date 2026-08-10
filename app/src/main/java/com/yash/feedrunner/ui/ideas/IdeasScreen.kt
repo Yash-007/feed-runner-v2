@@ -119,6 +119,9 @@ fun IdeasScreen(state: IdeasUiState, actions: IdeasActions) {
                             chatOpen = seed.key == state.chatSeedKey,
                             chatPending = seed.remoteId != null &&
                                 seed.remoteId == state.chatPendingId,
+                            chatError = state.chatError.takeIf {
+                                seed.remoteId != null && seed.remoteId == state.chatErrorId
+                            },
                             actions = actions,
                         )
                     }

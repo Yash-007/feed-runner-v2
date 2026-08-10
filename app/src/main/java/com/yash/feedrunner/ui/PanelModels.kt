@@ -136,6 +136,8 @@ sealed interface PanelState {
         val chat: List<ChatMessage> = emptyList(),
         /** True while a chat reply is in flight. */
         val chatPending: Boolean = false,
+        /** Set when a chat turn failed, shown in the thread with a retry. */
+        val chatError: String? = null,
     ) : PanelState
 
     data class Error(val message: String) : PanelState
