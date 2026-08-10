@@ -59,6 +59,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.yash.feedrunner.ui.theme.MetaTextStyle
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -90,6 +91,10 @@ fun RepostPanel(
     val scrollState = rememberScrollState()
     val scope = rememberCoroutineScope()
     val ready = state as? RepostState.Ready
+
+    // Reopened composer. Keyed on the result so a fresh generation collapses it
+    // again rather than leaving the sheet in edit mode.
+    var editing by remember(ready?.result?.savedAtMillis) { mutableStateOf(false) }
 
     // Same corner as the chat send button, so it yields while you are typing.
     var inputFocused by remember { mutableStateOf(false) }
@@ -146,23 +151,37 @@ fun RepostPanel(
                         TextButton(onClick = onDismiss) { Text("Close") }
                     }
 
-                    ModeToggle(
-                        mode = mode,
-                        enabled = state !is RepostState.Loading,
-                        onModeChange = onModeChange,
-                    )
+                    // Once drafts exist the composer has done its job, and leaving
+                    // it expanded pushes the drafts you came for below the fold.
+                    // It collapses to a brief you can reopen to change and rerun.
+                    if (ready == null || editing) {
+                        ModeToggle(
+                            mode = mode,
+                            enabled = state !is RepostState.Loading,
+                            onModeChange = onModeChange,
+                        )
 
-                    CapturedRow(capturePath = capturePath, onView = { viewerPath = it })
+                        CapturedRow(capturePath = capturePath, onView = { viewerPath = it })
 
-                    Composer(
-                        mode = mode,
-                        userText = userText,
-                        enabled = state !is RepostState.Loading,
-                        autoFocus = state is RepostState.Composing,
-                        onUserTextChange = onUserTextChange,
-                        onFocusChanged = trackFocus,
-                        onGenerate = onGenerate,
-                    )
+                        Composer(
+                            mode = mode,
+                            userText = userText,
+                            enabled = state !is RepostState.Loading,
+                            autoFocus = state is RepostState.Composing,
+                            onUserTextChange = onUserTextChange,
+                            onFocusChanged = trackFocus,
+                            onGenerate = onGenerate,
+                        )
+                    } else {
+                        ComposeBrief(
+                            mode = ready.result.mode,
+                            userText = userText,
+                            reading = ready.result.reading,
+                            capturePath = capturePath,
+                            onView = { viewerPath = it },
+                            onEdit = { editing = true },
+                        )
+                    }
 
                     when (state) {
                         is RepostState.Composing -> Unit
@@ -273,8 +292,8 @@ private fun CapturedRow(capturePath: String?, onView: (String) -> Unit) {
                 contentScale = ContentScale.Crop,
                 alignment = Alignment.TopCenter,
                 modifier = Modifier
-                    .size(width = 38.dp, height = 48.dp)
-                    .clip(RoundedCornerShape(7.dp))
+                    .size(width = 50.dp, height = 64.dp)
+                    .clip(RoundedCornerShape(8.dp))
                     .clickable { onView(capturePath) },
             )
         }
@@ -290,6 +309,95 @@ private fun CapturedRow(capturePath: String?, onView: (String) -> Unit) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
+    }
+}
+
+/**
+ * What the drafts were generated from, in one row: the capture, the mode, and what
+ * you typed. Everything here is a summary of a decision already made, so it stays
+ * small, but the capture is bigger than in the composer because checking it is the
+ * main reason to look back at this.
+ */
+@Composable
+private fun ComposeBrief(
+    mode: RepostMode,
+    userText: String,
+    reading: TextReading,
+    capturePath: String?,
+    onView: (String) -> Unit,
+    onEdit: () -> Unit,
+) {
+    val preview = rememberDecoded(capturePath, MAX_PREVIEW_PIXELS)
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 12.dp, bottom = 10.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f))
+            .padding(9.dp),
+    ) {
+        if (preview != null && capturePath != null) {
+            Image(
+                bitmap = preview.asImageBitmap(),
+                contentDescription = "View capture",
+                contentScale = ContentScale.Crop,
+                alignment = Alignment.TopCenter,
+                modifier = Modifier
+                    .size(width = 54.dp, height = 68.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .clickable { onView(capturePath) },
+            )
+        }
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .padding(start = if (preview != null) 10.dp else 2.dp),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = mode.label,
+                    fontSize = 9.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onPrimary,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(MaterialTheme.colorScheme.primary)
+                        .padding(horizontal = 6.dp, vertical = 2.dp),
+                )
+                if (reading != TextReading.NONE) {
+                    Text(
+                        text = reading.label,
+                        style = MetaTextStyle,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(start = 6.dp),
+                    )
+                }
+            }
+            Text(
+                text = userText.trim().ifBlank { "from the image alone" },
+                style = MaterialTheme.typography.bodyMedium,
+                fontStyle = if (userText.isBlank()) FontStyle.Italic else FontStyle.Normal,
+                color = if (userText.isBlank()) {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                } else {
+                    MaterialTheme.colorScheme.onSurface
+                },
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(top = 5.dp),
+            )
+        }
+        Text(
+            text = "edit",
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier
+                .clip(RoundedCornerShape(9.dp))
+                .clickable(onClick = onEdit)
+                .padding(horizontal = 8.dp, vertical = 8.dp),
+        )
     }
 }
 

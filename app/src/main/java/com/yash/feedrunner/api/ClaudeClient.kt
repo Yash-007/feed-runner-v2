@@ -345,9 +345,10 @@ class ClaudeClient(apiKey: String) {
         val ctx = fields["capture_context"] as? Map<*, *>
         val capture = CaptureContext(
             contentType = (ctx?.get("content_type") as? String).orEmpty(),
-            summary = (ctx?.get("summary") as? String)?.trim().orEmpty(),
+            summary = scrubTells((ctx?.get("summary") as? String).orEmpty()),
             quotedAuthor = (ctx?.get("quoted_author") as? String)?.trim()?.takeIf { it.isNotEmpty() },
-            quotedText = (ctx?.get("quoted_text") as? String)?.trim()?.takeIf { it.isNotEmpty() },
+            quotedText = (ctx?.get("quoted_text") as? String)
+                ?.let(::scrubTells)?.takeIf { it.isNotEmpty() },
         )
 
         val readingWire = (fields["user_text_read_as"] as? String).orEmpty()
@@ -364,7 +365,7 @@ class ClaudeClient(apiKey: String) {
             PostDraft(
                 id = index,
                 style = style,
-                thought = (draft["thought"] as? String)?.trim().orEmpty(),
+                thought = scrubTells((draft["thought"] as? String).orEmpty()),
                 text = scrubTells(text),
             )
         }
@@ -690,7 +691,7 @@ class ClaudeClient(apiKey: String) {
             Draft(
                 id = index,
                 angle = angle,
-                thought = (draft["thought"] as? String)?.trim().orEmpty(),
+                thought = scrubTells((draft["thought"] as? String).orEmpty()),
                 text = scrubTells(text),
             )
         }
