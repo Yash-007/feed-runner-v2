@@ -187,7 +187,7 @@ private fun TypingIndicator() {
     ) {
         Surface(
             shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp, bottomEnd = 16.dp, bottomStart = 4.dp),
-            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
+            color = MaterialTheme.colorScheme.surfaceVariant,
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
@@ -236,7 +236,7 @@ private fun ChatBubble(
             color = when {
                 fromUser -> MaterialTheme.colorScheme.primary.copy(alpha = 0.13f)
                 selecting -> MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)
-                else -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)
+                else -> MaterialTheme.colorScheme.surfaceVariant
             },
             border = if (selecting) {
                 BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.5f))
