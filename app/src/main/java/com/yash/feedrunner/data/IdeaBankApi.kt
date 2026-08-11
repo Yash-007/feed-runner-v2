@@ -92,23 +92,42 @@ class IdeaBankApi(private val config: BackendConfig) {
         request("DELETE", "/picks/$clientPickId", null)
     }
 
-    fun generateIdeas(remoteIds: List<String>, steer: String): List<PostIdea> {
+    /** Ideas plus the themes the model saw recurring across the bank. */
+    data class Ideation(val ideas: List<PostIdea>, val emergingLanes: List<String>)
+
+    fun generateIdeas(remoteIds: List<String>, steer: String): Ideation {
         val payload = JSONObject().apply {
             put("seed_ids", JSONArray().apply { remoteIds.forEach { put(it) } })
             put("steer", steer)
         }
-        val array = request("POST", "/ideas/generate", payload).optJSONArray("ideas")
+        val body = request("POST", "/ideas/generate", payload)
+        val array = body.optJSONArray("ideas")
             ?: throw IdeaBankException("Server returned no ideas")
-        return (0 until array.length()).mapNotNull { index ->
+
+        val ideas = (0 until array.length()).mapNotNull { index ->
             val item = array.optJSONObject(index) ?: return@mapNotNull null
-            val hook = item.optString("hook").takeIf { it.isNotBlank() } ?: return@mapNotNull null
+            val text = item.optString("post_text").takeIf { it.isNotBlank() }
+                ?: return@mapNotNull null
+            val refs = item.optJSONArray("seed_refs")
             PostIdea(
-                hook = hook,
-                body = item.optString("body"),
-                format = item.optString("format"),
+                postText = text,
+                play = item.optString("play"),
+                register = item.optString("register"),
+                lane = item.optString("lane"),
+                thought = item.optString("thought"),
                 whyNow = item.optString("why_now"),
+                seedRefs = (0 until (refs?.length() ?: 0)).mapNotNull { i ->
+                    refs?.optString(i)?.takeIf { it.isNotEmpty() }
+                },
             )
         }
+        val lanes = body.optJSONArray("emerging_lanes")
+        return Ideation(
+            ideas = ideas,
+            emergingLanes = (0 until (lanes?.length() ?: 0)).mapNotNull { i ->
+                lanes?.optString(i)?.takeIf { it.isNotEmpty() }
+            },
+        )
     }
 
     // --- transport ---------------------------------------------------------

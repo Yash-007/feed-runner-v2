@@ -76,10 +76,22 @@ data class StoredSeed(
         }
 }
 
-/** One idea returned by the ideation call. */
+/** One post idea returned by the ideation call. */
 data class PostIdea(
-    val hook: String,
-    val body: String = "",
-    val format: String = "",
+    val postText: String,
+    /** Which ideation play produced it: REPLY_PROMOTION, CLUSTER, SINGLE_SEED, TIMELY. */
+    val play: String = "",
+    /** The kind of post: take, shitpost, war_story, thought. */
+    val register: String = "",
+    /** Short theme label, e.g. "exchange infra reality". */
+    val lane: String = "",
+    /** What the post says, in at most ten words. */
+    val thought: String = "",
     val whyNow: String = "",
-)
+    /** Seeds it drew on, so an idea can be traced back to the bank. */
+    val seedRefs: List<String> = emptyList(),
+) {
+    /** Human label for the play, which is shouted in the wire format. */
+    val playLabel: String get() = play.lowercase().replace('_', ' ')
+    val registerLabel: String get() = register.lowercase().replace('_', ' ')
+}

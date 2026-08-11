@@ -202,7 +202,7 @@ class IdeaBankRepository(context: Context) {
         return runCatching { api.clearChat(id) }
     }
 
-    fun generateIdeas(seeds: List<StoredSeed>, steer: String): Result<List<PostIdea>> {
+    fun generateIdeas(seeds: List<StoredSeed>, steer: String): Result<IdeaBankApi.Ideation> {
         val ids = seeds.mapNotNull { it.remoteId }
         if (ids.isEmpty()) {
             return Result.failure(

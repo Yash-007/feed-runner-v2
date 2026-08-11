@@ -149,6 +149,7 @@ fun IdeasScreen(state: IdeasUiState, actions: IdeasActions) {
         ) {
             IdeasSheet(
                 ideas = state.ideas,
+                emergingLanes = state.emergingLanes,
                 generating = state.generating,
                 onCopy = actions.onCopy,
                 onRegenerate = { actions.onGenerate(steer) },
@@ -346,6 +347,7 @@ private fun TagChip(label: String, active: Boolean, onClick: () -> Unit) {
 @Composable
 private fun IdeasSheet(
     ideas: List<PostIdea>,
+    emergingLanes: List<String>,
     generating: Boolean,
     onCopy: (String) -> Unit,
     onRegenerate: () -> Unit,
@@ -379,6 +381,39 @@ private fun IdeasSheet(
             }
         }
 
+        // Lanes first: a theme the model saw three times over is a standing
+        // subject for the account, which is worth more than any single post here.
+        if (emergingLanes.isNotEmpty()) {
+            item {
+                Column(modifier = Modifier.padding(bottom = 10.dp)) {
+                    Text(
+                        text = "recurring lanes",
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        modifier = Modifier
+                            .padding(top = 5.dp)
+                            .horizontalScroll(rememberScrollState()),
+                    ) {
+                        emergingLanes.forEach { lane ->
+                            Text(
+                                text = lane,
+                                fontSize = 11.sp,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(14.dp))
+                                    .background(MaterialTheme.colorScheme.primaryContainer)
+                                    .padding(horizontal = 11.dp, vertical = 6.dp),
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
         itemsIndexed(ideas) { index, idea ->
             Column(
                 modifier = Modifier
@@ -386,26 +421,32 @@ private fun IdeasSheet(
                     .clip(RoundedCornerShape(12.dp))
                     .clickable {
                         haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                        onCopy(
-                            listOf(idea.hook, idea.body)
-                                .filter(String::isNotBlank)
-                                .joinToString("\n\n"),
-                        )
+                        onCopy(idea.postText)
                         copiedIndex = index
                     }
                     .padding(vertical = 12.dp),
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    if (idea.format.isNotBlank()) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(5.dp),
+                ) {
+                    if (idea.register.isNotBlank()) {
                         Text(
-                            text = idea.format,
+                            text = idea.registerLabel,
                             fontSize = 9.sp,
                             fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.primary,
+                            color = MaterialTheme.colorScheme.onPrimary,
                             modifier = Modifier
                                 .clip(RoundedCornerShape(5.dp))
-                                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f))
+                                .background(registerColor(idea.register))
                                 .padding(horizontal = 6.dp, vertical = 2.dp),
+                        )
+                    }
+                    if (idea.play.isNotBlank()) {
+                        Text(
+                            text = idea.playLabel,
+                            fontSize = 9.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
                     if (copiedIndex == index) {
@@ -413,30 +454,33 @@ private fun IdeasSheet(
                             text = "copied",
                             fontSize = 10.sp,
                             color = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.padding(start = 8.dp),
                         )
                     }
                 }
-                Text(
-                    text = idea.hook,
-                    style = MaterialTheme.typography.bodyLarge,
-                    modifier = Modifier.padding(top = 6.dp),
-                )
-                if (idea.body.isNotBlank()) {
+
+                if (idea.thought.isNotBlank()) {
                     Text(
-                        text = idea.body,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(top = 4.dp),
-                    )
-                }
-                if (idea.whyNow.isNotBlank()) {
-                    Text(
-                        text = "why now: ${idea.whyNow}",
-                        fontSize = 11.sp,
+                        text = idea.thought,
+                        style = MaterialTheme.typography.labelMedium,
                         fontStyle = FontStyle.Italic,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(top = 6.dp),
+                    )
+                }
+                Text(
+                    text = idea.postText,
+                    style = MaterialTheme.typography.bodyLarge,
+                    modifier = Modifier.padding(top = 6.dp),
+                )
+                if (idea.lane.isNotBlank() || idea.whyNow.isNotBlank()) {
+                    Text(
+                        text = listOf(idea.lane, idea.whyNow)
+                            .filter(String::isNotBlank)
+                            .joinToString(" · "),
+                        fontSize = 11.sp,
+                        fontStyle = FontStyle.Italic,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 8.dp),
                     )
                 }
                 HorizontalDivider(
@@ -446,6 +490,14 @@ private fun IdeasSheet(
             }
         }
     }
+}
+
+/** Register colours, so the tonal mix of a batch is visible at a glance. */
+private fun registerColor(register: String): Color = when (register.lowercase()) {
+    "shitpost" -> Color(0xFFF5A623)
+    "war_story" -> Color(0xFFFF6B9D)
+    "thought" -> Color(0xFF00BA7C)
+    else -> Color(0xFF1D9BF0)
 }
 
 @Composable

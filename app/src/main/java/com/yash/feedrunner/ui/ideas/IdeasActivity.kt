@@ -32,6 +32,8 @@ data class IdeasUiState(
     val seeds: List<StoredSeed> = emptyList(),
     val selectedIds: Set<String> = emptySet(),
     val ideas: List<PostIdea> = emptyList(),
+    /** Themes the model saw across 3 or more seeds, worth treating as lanes. */
+    val emergingLanes: List<String> = emptyList(),
     val filter: SeedStatus? = null,
     /** Theme tag to narrow by, applied on top of the status filter. */
     val tagFilter: String? = null,
@@ -133,7 +135,9 @@ class IdeasActivity : ComponentActivity() {
                             onAddManual = ::addManual,
                             onSetBaseUrl = ::setBaseUrl,
                             onCopy = ::copy,
-                            onClearIdeas = { state = state.copy(ideas = emptyList()) },
+                            onClearIdeas = {
+                                state = state.copy(ideas = emptyList(), emergingLanes = emptyList())
+                            },
                             onToggleChat = ::toggleChat,
                             onSendChat = ::sendChat,
                             onRetryChat = ::retryChat,
@@ -310,7 +314,13 @@ class IdeasActivity : ComponentActivity() {
         lifecycleScope.launch {
             val outcome = withContext(Dispatchers.IO) { repository.generateIdeas(chosen, steer) }
             state = outcome.fold(
-                onSuccess = { state.copy(ideas = it, generating = false) },
+                onSuccess = {
+                    state.copy(
+                        ideas = it.ideas,
+                        emergingLanes = it.emergingLanes,
+                        generating = false,
+                    )
+                },
                 onFailure = {
                     state.copy(generating = false, message = it.message ?: "Generation failed")
                 },
