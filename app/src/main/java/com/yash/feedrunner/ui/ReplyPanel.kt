@@ -702,4 +702,4 @@ private fun RefinementChip(label: String, enabled: Boolean, onClick: () -> Unit)
 private const val STICKY_HEADER_AFTER_PX = 220
 
 /** Same green as a posted seed, so "done with this" looks the same everywhere. */
-private val UsedGreen = Color(0xFF00BA7C)
+internal val UsedGreen = Color(0xFF00BA7C)

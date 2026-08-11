@@ -17,6 +17,8 @@ import com.yash.feedrunner.BuildConfig
 import com.yash.feedrunner.api.ClaudeClient
 import com.yash.feedrunner.api.ClaudeException
 import com.yash.feedrunner.data.ReadState
+import com.yash.feedrunner.data.IdeaBankRepository
+import com.yash.feedrunner.data.DraftPick
 import com.yash.feedrunner.data.ResultStore
 import com.yash.feedrunner.work.AnalysisManager
 import com.yash.feedrunner.data.VoiceRulesStore
@@ -42,6 +44,7 @@ class PanelController(
     private val window = OverlayWindow(context, windowManager)
     private val voiceRulesStore = VoiceRulesStore(context)
     private val readState = ReadState(context)
+    private val ideaBank = IdeaBankRepository(context)
 
     private val claude: ClaudeClient? by lazy {
         BuildConfig.ANTHROPIC_API_KEY
@@ -330,7 +333,31 @@ class PanelController(
 
         val updated = ready.drafts.map { if (it.id == draft.id) it.copy(used = used) else it }
         state = ready.copy(drafts = updated)
-        currentResultId?.let { resultStore.updateDrafts(it, updated) }
+        val resultId = currentResultId
+        resultId?.let { resultStore.updateDrafts(it, updated) }
+
+        // The backend mirrors this marker, so unmarking removes the pick there too.
+        // Keyed on the result and the draft, which is why a refinement followed by
+        // another copy replaces the stored text instead of adding a second pick.
+        if (resultId == null) return
+        val pickId = "reply-$resultId-${draft.id}"
+        if (used) {
+            val current = updated.first { it.id == draft.id }
+            ideaBank.recordPick(
+                DraftPick(
+                    clientPickId = pickId,
+                    source = "reply",
+                    variant = current.angle.name,
+                    thought = current.thought,
+                    text = current.text,
+                    postAuthor = ready.postContext.author,
+                    postText = ready.postContext.postText,
+                    pickedAtMillis = System.currentTimeMillis(),
+                ),
+            )
+        } else {
+            ideaBank.removePick(pickId)
+        }
     }
 
     private fun toggleUsed(draft: Draft) = setUsed(draft, used = !draft.used)

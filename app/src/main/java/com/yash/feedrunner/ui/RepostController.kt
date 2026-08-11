@@ -17,6 +17,7 @@ import com.yash.feedrunner.BuildConfig
 import com.yash.feedrunner.api.ClaudeClient
 import com.yash.feedrunner.api.ClaudeException
 import com.yash.feedrunner.api.ImagePrep
+import com.yash.feedrunner.data.DraftPick
 import com.yash.feedrunner.data.IdeaBankRepository
 import com.yash.feedrunner.data.RepostStore
 import com.yash.feedrunner.data.VoiceRulesStore
@@ -127,8 +128,10 @@ class RepostController(
                     onUserTextChange = { userText = it },
                     onGenerate = ::generate,
                     onCopyText = ::copyText,
+                    onCopyDraft = ::copyDraft,
                     onSendChat = ::sendChat,
                     onRetryChat = ::retryChat,
+                    onToggleUsed = ::toggleUsed,
                     heldDraftsAge = heldResult
                         ?.takeIf { state is RepostState.Composing }
                         ?.let { relativeAge(it.savedAtMillis) },
@@ -296,9 +299,50 @@ class RepostController(
         sendChat(message)
     }
 
+    /** Chat and other loose text. Not a draft, so it is not a pick. */
     private fun copyText(text: String) {
         val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
         clipboard.setPrimaryClip(ClipData.newPlainText("post", text))
+    }
+
+    /** Copying a draft is the choice, so it marks it used and records the pick. */
+    private fun copyDraft(draft: PostDraft) {
+        copyText(draft.text)
+        setUsed(draft, used = true)
+    }
+
+    private fun toggleUsed(draft: PostDraft) = setUsed(draft, used = !draft.used)
+
+    /** Flips the marker, persists it, and mirrors it to the backend as a pick. */
+    private fun setUsed(draft: PostDraft, used: Boolean) {
+        val ready = state as? RepostState.Ready ?: return
+        val result = ready.result
+        if (result.drafts.none { it.id == draft.id }) return
+
+        val updated = result.drafts.map { if (it.id == draft.id) it.copy(used = used) else it }
+        val nextResult = result.copy(drafts = updated)
+        state = ready.copy(result = nextResult)
+        heldResult = nextResult
+        store.save(nextResult)
+
+        val pickId = "${result.mode.wire}-${result.savedAtMillis}-${draft.id}"
+        if (used) {
+            val current = updated.first { it.id == draft.id }
+            ideaBank.recordPick(
+                DraftPick(
+                    clientPickId = pickId,
+                    source = result.mode.wire,
+                    variant = current.style.name,
+                    thought = current.thought,
+                    text = current.text,
+                    postAuthor = result.capture.quotedAuthor.orEmpty(),
+                    postText = result.capture.summary,
+                    pickedAtMillis = System.currentTimeMillis(),
+                ),
+            )
+        } else {
+            ideaBank.removePick(pickId)
+        }
     }
 
     /**

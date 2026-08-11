@@ -83,8 +83,10 @@ fun RepostPanel(
     onUserTextChange: (String) -> Unit,
     onGenerate: () -> Unit,
     onCopyText: (String) -> Unit,
+    onCopyDraft: (PostDraft) -> Unit,
     onSendChat: (String) -> Unit,
     onRetryChat: () -> Unit,
+    onToggleUsed: (PostDraft) -> Unit,
     heldDraftsAge: String?,
     onOpenHeldDrafts: () -> Unit,
     onFocusChanged: (Boolean) -> Unit,
@@ -199,7 +201,11 @@ fun RepostPanel(
                             modifier = Modifier.padding(top = 16.dp),
                         )
                         is RepostState.Ready -> {
-                            Results(result = state.result, onCopyText = onCopyText)
+                            Results(
+                            result = state.result,
+                            onCopyDraft = onCopyDraft,
+                            onToggleUsed = onToggleUsed,
+                        )
                             ChatThread(
                                 chat = state.result.chat,
                                 pending = state.chatPending,
@@ -261,6 +267,40 @@ private fun HeldDraftsBanner(age: String, onOpen: () -> Unit) {
             fontWeight = FontWeight.SemiBold,
             color = MaterialTheme.colorScheme.primary,
         )
+    }
+}
+
+/**
+ * Marks a post draft as the one you used. Copying sets it, and the backend mirrors
+ * it, so tapping here to unmark removes the stored pick as well.
+ */
+@Composable
+private fun PostUsedMarker(used: Boolean, onClick: () -> Unit) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .clip(RoundedCornerShape(9.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 6.dp, vertical = 3.dp),
+    ) {
+        Text(
+            text = "✓",
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Bold,
+            color = if (used) {
+                UsedGreen
+            } else {
+                MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.35f)
+            },
+        )
+        if (used) {
+            Text(
+                text = " used",
+                style = MetaTextStyle,
+                fontWeight = FontWeight.SemiBold,
+                color = UsedGreen,
+            )
+        }
     }
 }
 
@@ -568,7 +608,11 @@ private fun GeneratingRow(mode: RepostMode) {
 }
 
 @Composable
-private fun Results(result: RepostResult, onCopyText: (String) -> Unit) {
+private fun Results(
+    result: RepostResult,
+    onCopyDraft: (PostDraft) -> Unit,
+    onToggleUsed: (PostDraft) -> Unit,
+) {
     var selectingId by remember { mutableIntStateOf(-1) }
     var copiedId by remember { mutableIntStateOf(-1) }
 
@@ -607,10 +651,11 @@ private fun Results(result: RepostResult, onCopyText: (String) -> Unit) {
                 selecting = selectingId == draft.id,
                 copied = copiedId == draft.id,
                 onCopy = {
-                    onCopyText(draft.text)
+                    onCopyDraft(draft)
                     copiedId = draft.id
                     selectingId = -1
                 },
+                onToggleUsed = { onToggleUsed(draft) },
                 onLongPress = { selectingId = draft.id },
             )
         }
@@ -674,6 +719,7 @@ private fun PostDraftCard(
     selecting: Boolean,
     copied: Boolean,
     onCopy: () -> Unit,
+    onToggleUsed: () -> Unit,
     onLongPress: () -> Unit,
 ) {
     val haptics = LocalHapticFeedback.current
@@ -716,9 +762,12 @@ private fun PostDraftCard(
                                 overflow = TextOverflow.Ellipsis,
                                 modifier = Modifier
                                     .padding(start = 7.dp)
-                                    .weight(1f, fill = false),
+                                    .weight(1f),
                             )
+                        } else {
+                            Box(modifier = Modifier.weight(1f))
                         }
+                        PostUsedMarker(used = draft.used, onClick = onToggleUsed)
                     }
                     Text(
                         text = draft.text,

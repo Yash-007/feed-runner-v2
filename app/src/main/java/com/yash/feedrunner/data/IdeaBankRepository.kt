@@ -20,6 +20,7 @@ import java.util.concurrent.Executors
 class IdeaBankRepository(context: Context) {
 
     private val outbox = SeedOutbox(context)
+    private val pickOutbox = PickOutbox(context)
     private val config = BackendConfig(context)
     private val api = IdeaBankApi(config)
 
@@ -28,7 +29,7 @@ class IdeaBankRepository(context: Context) {
 
     val backendConfig: BackendConfig get() = config
 
-    val pendingCount: Int get() = outbox.size
+    val pendingCount: Int get() = outbox.size + pickOutbox.size
 
     /**
      * Banks a seed from a generation. Silent by design: the reply flow must not
@@ -83,9 +84,52 @@ class IdeaBankRepository(context: Context) {
         flushAsync()
     }
 
+    /**
+     * Records a draft you copied. Queued first so a choice is never lost to a
+     * sleeping laptop, and silent like seed recording: copying must not turn into
+     * an error message over someone else's app.
+     */
+    fun recordPick(pick: DraftPick) {
+        pickOutbox.put(pick)
+        Log.i(TAG, "picked ${pick.clientPickId} (${pick.variant})")
+        flushAsync()
+    }
+
+    /** Mirrors unmarking "used": the pick is removed rather than annotated. */
+    fun removePick(clientPickId: String) {
+        pickOutbox.delete(clientPickId)
+        Log.i(TAG, "unpicked $clientPickId")
+        flushAsync()
+    }
+
     fun flushAsync() {
         if (!config.isConfigured) return
-        worker.execute { flush() }
+        worker.execute {
+            flush()
+            flushPicks()
+        }
+    }
+
+    /** Drains queued pick changes. Returns how many reached the server. */
+    fun flushPicks(): Int {
+        if (!config.isConfigured) return 0
+        var sent = 0
+        for (op in pickOutbox.pending()) {
+            val done = runCatching {
+                val pick = op.pick
+                if (pick == null) api.deletePick(op.clientPickId) else api.savePick(pick)
+            }
+            if (done.isSuccess) {
+                pickOutbox.remove(op.clientPickId)
+                sent++
+            } else {
+                Log.w(TAG, "pick sync failed, keeping it queued", done.exceptionOrNull())
+                // Stop on the first failure: the rest will fail the same way, and
+                // order matters when a draft was marked and then unmarked.
+                break
+            }
+        }
+        return sent
     }
 
     /** Uploads everything queued. Returns how many made it. */
@@ -114,6 +158,9 @@ class IdeaBankRepository(context: Context) {
      */
     fun loadSeeds(filter: SeedStatus?): Result<List<StoredSeed>> {
         flush()
+        // Picks queue up whenever the laptop is unreachable, and marking is not
+        // something you do often enough to rely on as the only drain.
+        flushPicks()
         return runCatching { api.listSeeds(filter) }
             .map { remote ->
                 // Queued seeds are shown alongside so nothing is invisible.

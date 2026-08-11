@@ -78,6 +78,7 @@ class RepostStore(context: Context) {
                             put("style", draft.style.name)
                             put("thought", draft.thought)
                             put("text", draft.text)
+                            put("used", draft.used)
                         },
                     )
                 }
@@ -97,6 +98,7 @@ class RepostStore(context: Context) {
                 style = style,
                 thought = item.optString("thought"),
                 text = item.getString("text"),
+                used = item.optBoolean("used"),
             )
         }
         if (drafts.isEmpty()) return@runCatching null

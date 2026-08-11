@@ -47,6 +47,8 @@ data class PostDraft(
     /** One short line summarising the idea, so a draft can be judged at a glance. */
     val thought: String,
     val text: String,
+    /** Set when you copy it, mirrored to the backend as a pick. */
+    val used: Boolean = false,
 )
 
 /** A completed generation, kept so closing the sheet does not lose it. */

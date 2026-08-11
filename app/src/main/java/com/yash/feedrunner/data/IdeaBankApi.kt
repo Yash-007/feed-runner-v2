@@ -72,6 +72,26 @@ class IdeaBankApi(private val config: BackendConfig) {
         request("DELETE", "/seeds/$remoteId", null)
     }
 
+    /** Idempotent: re-copying the same draft updates the one row. */
+    fun savePick(pick: DraftPick) {
+        val payload = JSONObject().apply {
+            put("client_pick_id", pick.clientPickId)
+            put("source", pick.source)
+            put("variant", pick.variant)
+            put("thought", pick.thought)
+            put("text", pick.text)
+            put("post_author", pick.postAuthor)
+            put("post_text", pick.postText)
+            put("picked_at_millis", pick.pickedAtMillis)
+        }
+        request("PUT", "/picks", payload)
+    }
+
+    /** Unmarking "used". Succeeds even if the server never had the pick. */
+    fun deletePick(clientPickId: String) {
+        request("DELETE", "/picks/$clientPickId", null)
+    }
+
     fun generateIdeas(remoteIds: List<String>, steer: String): List<PostIdea> {
         val payload = JSONObject().apply {
             put("seed_ids", JSONArray().apply { remoteIds.forEach { put(it) } })
