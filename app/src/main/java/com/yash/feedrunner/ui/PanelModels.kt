@@ -91,7 +91,11 @@ data class Draft(
 enum class ChatRole { USER, ASSISTANT }
 
 /** One turn in the per-post chat. */
-data class ChatMessage(val role: ChatRole, val text: String)
+/**
+ * One chat turn. [atMillis] is only set for seed threads, where messages and
+ * generated ideas share one timeline and have to be ordered against each other.
+ */
+data class ChatMessage(val role: ChatRole, val text: String, val atMillis: Long = 0L)
 
 /** The most recent analysis, persisted so it can be reopened for free. */
 data class StoredResult(

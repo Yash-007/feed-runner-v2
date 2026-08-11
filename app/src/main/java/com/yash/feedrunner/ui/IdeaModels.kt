@@ -63,6 +63,12 @@ data class StoredSeed(
     val createdAtMillis: Long = 0L,
     /** Conversation about this seed, stored server-side so it follows the seed. */
     val chat: List<ChatMessage> = emptyList(),
+    /** Posts generated in that conversation. */
+    val ideas: List<SeedIdea> = emptyList(),
+    /** Latest emerging-lane read for this seed's themes. */
+    val lanes: List<String> = emptyList(),
+    /** How many generations have run, so a new round can be grouped. */
+    val rounds: Int = 0,
 ) {
     val isPending: Boolean get() = remoteId == null
 
@@ -74,6 +80,23 @@ data class StoredSeed(
             seed.angleHint.isNotBlank() -> seed.angleHint
             else -> seed.themeTags.joinToString(", ")
         }
+}
+
+/** A generated post, stored on the seed it came from. */
+data class SeedIdea(
+    val id: String,
+    val postText: String,
+    val play: String = "",
+    val register: String = "",
+    val lane: String = "",
+    val thought: String = "",
+    val whyNow: String = "",
+    /** Which generation produced it, so earlier rounds can be folded away. */
+    val round: Int = 0,
+    val atMillis: Long = 0L,
+) {
+    val playLabel: String get() = play.lowercase().replace('_', ' ')
+    val registerLabel: String get() = register.lowercase().replace('_', ' ')
 }
 
 /** One post idea returned by the ideation call. */

@@ -67,8 +67,6 @@ import com.yash.feedrunner.ui.SeedStatus
 fun IdeasScreen(state: IdeasUiState, actions: IdeasActions) {
     var showManualDialog by remember { mutableStateOf(false) }
     var showAddressDialog by remember { mutableStateOf(false) }
-    var steer by remember { mutableStateOf("") }
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     Column(modifier = Modifier.fillMaxSize()) {
         Header(
@@ -112,49 +110,13 @@ fun IdeasScreen(state: IdeasUiState, actions: IdeasActions) {
                     verticalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
                     items(state.visibleSeeds, key = { it.key }) { seed ->
-                        SeedCard(
-                            seed = seed,
-                            selected = seed.remoteId in state.selectedIds,
-                            expanded = seed.key == state.expandedSeedKey,
-                            chatOpen = seed.key == state.chatSeedKey,
-                            chatPending = seed.remoteId != null &&
-                                seed.remoteId == state.chatPendingId,
-                            chatError = state.chatError.takeIf {
-                                seed.remoteId != null && seed.remoteId == state.chatErrorId
-                            },
-                            actions = actions,
-                        )
+                        SeedCard(seed = seed, onOpen = { actions.onOpenSeed(seed) })
                     }
                 }
             }
         }
 
-        BottomBar(
-            selectedCount = state.selectedIds.size,
-            generating = state.generating,
-            steer = steer,
-            onSteerChange = { steer = it },
-            onGenerate = { actions.onGenerate(steer) },
-            onAddManual = { showManualDialog = true },
-            onClearSelection = actions.onClearSelection,
-        )
-    }
-
-    // Ideas get the whole sheet. They were previously squeezed into a 320dp strip
-    // at the bottom, which a single thread idea overflowed on its own.
-    if (state.ideas.isNotEmpty()) {
-        ModalBottomSheet(
-            onDismissRequest = actions.onClearIdeas,
-            sheetState = sheetState,
-        ) {
-            IdeasSheet(
-                ideas = state.ideas,
-                emergingLanes = state.emergingLanes,
-                generating = state.generating,
-                onCopy = actions.onCopy,
-                onRegenerate = { actions.onGenerate(steer) },
-            )
-        }
+        BottomBar(onAddManual = { showManualDialog = true })
     }
 
     state.pendingDelete?.let { seed ->
@@ -345,242 +307,21 @@ private fun TagChip(label: String, active: Boolean, onClick: () -> Unit) {
 }
 
 @Composable
-private fun IdeasSheet(
-    ideas: List<PostIdea>,
-    emergingLanes: List<String>,
-    generating: Boolean,
-    onCopy: (String) -> Unit,
-    onRegenerate: () -> Unit,
-) {
-    val haptics = LocalHapticFeedback.current
-    var copiedIndex by remember { mutableIntStateOf(-1) }
-
-    LazyColumn(
-        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 32.dp),
-        modifier = Modifier.navigationBarsPadding(),
-    ) {
-        item {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.padding(bottom = 4.dp),
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = "${ideas.size} post ideas",
-                        style = MaterialTheme.typography.titleMedium,
-                    )
-                    Text(
-                        text = "tap one to copy it",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                TextButton(onClick = onRegenerate, enabled = !generating) {
-                    Text(if (generating) "working" else "again")
-                }
-            }
-        }
-
-        // Lanes first: a theme the model saw three times over is a standing
-        // subject for the account, which is worth more than any single post here.
-        if (emergingLanes.isNotEmpty()) {
-            item {
-                Column(modifier = Modifier.padding(bottom = 10.dp)) {
-                    Text(
-                        text = "recurring lanes",
-                        fontSize = 9.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        modifier = Modifier
-                            .padding(top = 5.dp)
-                            .horizontalScroll(rememberScrollState()),
-                    ) {
-                        emergingLanes.forEach { lane ->
-                            Text(
-                                text = lane,
-                                fontSize = 11.sp,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer,
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(14.dp))
-                                    .background(MaterialTheme.colorScheme.primaryContainer)
-                                    .padding(horizontal = 11.dp, vertical = 6.dp),
-                            )
-                        }
-                    }
-                }
-            }
-        }
-
-        itemsIndexed(ideas) { index, idea ->
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(12.dp))
-                    .clickable {
-                        haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                        onCopy(idea.postText)
-                        copiedIndex = index
-                    }
-                    .padding(vertical = 12.dp),
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(5.dp),
-                ) {
-                    if (idea.register.isNotBlank()) {
-                        Text(
-                            text = idea.registerLabel,
-                            fontSize = 9.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.onPrimary,
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(5.dp))
-                                .background(registerColor(idea.register))
-                                .padding(horizontal = 6.dp, vertical = 2.dp),
-                        )
-                    }
-                    if (idea.play.isNotBlank()) {
-                        Text(
-                            text = idea.playLabel,
-                            fontSize = 9.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                    if (copiedIndex == index) {
-                        Text(
-                            text = "copied",
-                            fontSize = 10.sp,
-                            color = MaterialTheme.colorScheme.primary,
-                        )
-                    }
-                }
-
-                if (idea.thought.isNotBlank()) {
-                    Text(
-                        text = idea.thought,
-                        style = MaterialTheme.typography.labelMedium,
-                        fontStyle = FontStyle.Italic,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(top = 6.dp),
-                    )
-                }
-                Text(
-                    text = idea.postText,
-                    style = MaterialTheme.typography.bodyLarge,
-                    modifier = Modifier.padding(top = 6.dp),
-                )
-                if (idea.lane.isNotBlank() || idea.whyNow.isNotBlank()) {
-                    Text(
-                        text = listOf(idea.lane, idea.whyNow)
-                            .filter(String::isNotBlank)
-                            .joinToString(" · "),
-                        fontSize = 11.sp,
-                        fontStyle = FontStyle.Italic,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(top = 8.dp),
-                    )
-                }
-                HorizontalDivider(
-                    color = MaterialTheme.colorScheme.outlineVariant,
-                    modifier = Modifier.padding(top = 12.dp),
-                )
-            }
-        }
-    }
-}
-
-/** Register colours, so the tonal mix of a batch is visible at a glance. */
-private fun registerColor(register: String): Color = when (register.lowercase()) {
-    "shitpost" -> Color(0xFFF5A623)
-    "war_story" -> Color(0xFFFF6B9D)
-    "thought" -> Color(0xFF00BA7C)
-    else -> Color(0xFF1D9BF0)
-}
-
-@Composable
-private fun BottomBar(
-    selectedCount: Int,
-    generating: Boolean,
-    steer: String,
-    onSteerChange: (String) -> Unit,
-    onGenerate: () -> Unit,
-    onAddManual: () -> Unit,
-    onClearSelection: () -> Unit,
-) {
+private fun BottomBar(onAddManual: () -> Unit) {
     Surface(tonalElevation = 3.dp, modifier = Modifier.fillMaxWidth()) {
-        Column(
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier
-                .imePadding()
+                .fillMaxWidth()
                 .padding(horizontal = 12.dp, vertical = 10.dp),
         ) {
-            AnimatedVisibility(visible = selectedCount > 0) {
-                Column {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.padding(bottom = 6.dp),
-                    ) {
-                        Text(
-                            text = "$selectedCount selected",
-                            style = MaterialTheme.typography.labelMedium,
-                            modifier = Modifier.weight(1f),
-                        )
-                        Text(
-                            text = "clear",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(8.dp))
-                                .clickable(onClick = onClearSelection)
-                                .padding(horizontal = 8.dp, vertical = 4.dp),
-                        )
-                    }
-                    OutlinedTextField(
-                        value = steer,
-                        onValueChange = onSteerChange,
-                        placeholder = { Text("optional: what you want from this round") },
-                        textStyle = MaterialTheme.typography.bodyMedium,
-                        shape = RoundedCornerShape(18.dp),
-                        maxLines = 3,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(bottom = 8.dp),
-                    )
-                }
-            }
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                OutlinedButton(onClick = onAddManual) { Text("Add mine") }
-                Button(
-                    onClick = onGenerate,
-                    enabled = selectedCount > 0 && !generating,
-                    modifier = Modifier
-                        .weight(1f)
-                        .heightIn(min = 44.dp),
-                ) {
-                    if (generating) {
-                        // The button is disabled while working, so its content
-                        // colour is the disabled one, not onPrimary.
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(15.dp),
-                            strokeWidth = 2.dp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    } else {
-                        Text(
-                            text = if (selectedCount == 0) {
-                                "Tick seeds to build on"
-                            } else {
-                                "Generate post ideas ($selectedCount)"
-                            },
-                        )
-                    }
-                }
-            }
+            Text(
+                text = "Tap a seed to write posts from it",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.weight(1f),
+            )
+            OutlinedButton(onClick = onAddManual) { Text("Add mine") }
         }
     }
 }

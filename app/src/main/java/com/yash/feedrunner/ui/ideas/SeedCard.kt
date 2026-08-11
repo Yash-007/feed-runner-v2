@@ -40,6 +40,7 @@ import com.yash.feedrunner.ui.SEED_QUICK_PROMPTS
 import com.yash.feedrunner.ui.SeedStatus
 import com.yash.feedrunner.ui.StoredSeed
 import com.yash.feedrunner.ui.relativeAge
+import com.yash.feedrunner.ui.theme.MetaTextStyle
 
 /**
  * One banked seed.
@@ -54,203 +55,53 @@ import com.yash.feedrunner.ui.relativeAge
  * because a list of fully expanded seeds is unreadable at ten items.
  */
 @Composable
-internal fun SeedCard(
-    seed: StoredSeed,
-    selected: Boolean,
-    expanded: Boolean,
-    chatOpen: Boolean,
-    chatPending: Boolean,
-    chatError: String?,
-    actions: IdeasActions,
-) {
+internal fun SeedCard(seed: StoredSeed, onOpen: () -> Unit) {
     Surface(
         shape = RoundedCornerShape(16.dp),
-        color = if (selected) {
-            MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
-        } else {
-            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
-        },
-        border = if (selected) {
-            BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.5f))
-        } else {
-            null
-        },
-        modifier = Modifier.fillMaxWidth(),
-    ) {
-        Column {
-            Row(
-                verticalAlignment = Alignment.Top,
-                modifier = Modifier.padding(start = 6.dp, top = 10.dp, end = 12.dp),
-            ) {
-                SelectBox(
-                    selected = selected,
-                    enabled = !seed.isPending,
-                    onClick = { actions.onToggleSelect(seed) },
-                )
-
-                Column(
-                    modifier = Modifier
-                        .weight(1f)
-                        .clickable { actions.onToggleExpand(seed) }
-                        .padding(bottom = 12.dp, end = 4.dp),
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        ChipRow(seed = seed, modifier = Modifier.weight(1f))
-                        Text(
-                            text = if (seed.isPending) {
-                                "syncing"
-                            } else {
-                                relativeAge(seed.createdAtMillis)
-                            },
-                            fontSize = 10.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-
-                    Text(
-                        text = seed.headline,
-                        style = MaterialTheme.typography.bodyLarge,
-                        maxLines = if (expanded) Int.MAX_VALUE else 3,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.padding(top = 8.dp),
-                    )
-
-                    if (seed.seed.themeTags.isNotEmpty()) {
-                        Text(
-                            text = seed.seed.themeTags.joinToString(" · "),
-                            fontSize = 11.sp,
-                            color = MaterialTheme.colorScheme.primary,
-                            maxLines = if (expanded) Int.MAX_VALUE else 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.padding(top = 6.dp),
-                        )
-                    }
-
-                    AnimatedVisibility(visible = expanded) {
-                        Column {
-                            // The angle hint is the part worth acting on, so it gets
-                            // a label rather than sitting as anonymous italics.
-                            if (seed.seed.angleHint.isNotBlank()) {
-                                Text(
-                                    text = "your angle",
-                                    fontSize = 9.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.padding(top = 12.dp),
-                                )
-                                Text(
-                                    text = seed.seed.angleHint,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    fontStyle = FontStyle.Italic,
-                                    modifier = Modifier.padding(top = 2.dp),
-                                )
-                            }
-                            if (seed.postAuthor.isNotBlank() || seed.postText.isNotBlank()) {
-                                Text(
-                                    text = buildString {
-                                        append("from ")
-                                        append(seed.postAuthor.ifBlank { "a post" })
-                                        if (seed.postText.isNotBlank()) {
-                                            append(": \"")
-                                            append(seed.postText.take(160))
-                                            append('"')
-                                        }
-                                    },
-                                    fontSize = 11.sp,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.padding(top = 10.dp),
-                                )
-                            }
-                        }
-                    }
-                }
-
-            }
-
-            AnimatedVisibility(visible = expanded && !seed.isPending) {
-                Column(modifier = Modifier.padding(start = 16.dp, end = 14.dp, bottom = 6.dp)) {
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.padding(top = 6.dp),
-                    ) {
-                        StatusMenu(
-                            current = seed.status,
-                            onPick = { actions.onSetStatus(seed, it) },
-                        )
-                        TextAction(
-                            label = if (chatOpen) "hide chat" else {
-                                if (seed.chat.isEmpty()) "chat" else "chat (${seed.chat.size})"
-                            },
-                            emphasised = seed.chat.isNotEmpty(),
-                            onClick = { actions.onToggleChat(seed) },
-                        )
-                        Box(modifier = Modifier.weight(1f))
-                        TextAction(
-                            label = "delete",
-                            tint = MaterialTheme.colorScheme.error,
-                            onClick = { actions.onAskDelete(seed) },
-                        )
-                    }
-
-                    if (chatOpen) {
-                        ChatThread(
-                            chat = seed.chat,
-                            pending = chatPending,
-                            quickPrompts = SEED_QUICK_PROMPTS,
-                            title = "Develop this idea",
-                            error = chatError,
-                            onCopyText = actions.onCopy,
-                            onSend = { actions.onSendChat(seed, it) },
-                            onRetry = { actions.onRetryChat(seed) },
-                            // An activity already holds window focus, unlike the
-                            // overlay panels that have to ask for it.
-                            onFocusChanged = {},
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
-/** Big enough to hit deliberately, and clearly a checkbox rather than a dot. */
-@Composable
-private fun SelectBox(selected: Boolean, enabled: Boolean, onClick: () -> Unit) {
-    Box(
-        contentAlignment = Alignment.Center,
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
         modifier = Modifier
-            .padding(end = 4.dp)
-            .size(40.dp)
-            .clip(CircleShape)
-            .clickable(enabled = enabled, onClick = onClick),
+            .fillMaxWidth()
+            .clickable(enabled = !seed.isPending, onClick = onOpen),
     ) {
-        Surface(
-            shape = RoundedCornerShape(7.dp),
-            color = if (selected) {
-                MaterialTheme.colorScheme.primary
-            } else {
-                Color.Transparent
-            },
-            border = BorderStroke(
-                width = 1.5.dp,
-                color = if (selected) {
-                    MaterialTheme.colorScheme.primary
-                } else {
-                    MaterialTheme.colorScheme.outline.copy(alpha = if (enabled) 0.7f else 0.25f)
-                },
-            ),
-            modifier = Modifier.size(21.dp),
-        ) {
-            Box(contentAlignment = Alignment.Center) {
-                if (selected) {
-                    Text(
-                        text = "✓",
-                        color = MaterialTheme.colorScheme.onPrimary,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold,
-                    )
-                }
+        Column(modifier = Modifier.padding(14.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                ChipRow(seed = seed, modifier = Modifier.weight(1f))
+                Text(
+                    text = if (seed.isPending) "syncing" else relativeAge(seed.createdAtMillis),
+                    fontSize = 10.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+
+            Text(
+                text = seed.headline,
+                style = MaterialTheme.typography.bodyLarge,
+                maxLines = 3,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(top = 8.dp),
+            )
+
+            if (seed.seed.themeTags.isNotEmpty()) {
+                Text(
+                    text = seed.seed.themeTags.joinToString(" · "),
+                    fontSize = 11.sp,
+                    color = MaterialTheme.colorScheme.primary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(top = 6.dp),
+                )
+            }
+
+            // The one number worth surfacing in the list: whether this seed has
+            // already produced posts you have not dealt with.
+            if (seed.ideas.isNotEmpty()) {
+                Text(
+                    text = "${seed.ideas.size} ideas",
+                    style = MetaTextStyle,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(top = 7.dp),
+                )
             }
         }
     }
@@ -308,52 +159,4 @@ private fun Chip(text: String, container: Color, content: Color, border: Color? 
             modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp),
         )
     }
-}
-
-/** Status as a menu, so three states cost one control instead of two buttons. */
-@Composable
-private fun StatusMenu(current: SeedStatus, onPick: (SeedStatus) -> Unit) {
-    var open by remember { mutableStateOf(false) }
-    Box {
-        TextAction(label = "status: ${current.label} ▾", onClick = { open = true })
-        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
-            SeedStatus.entries.forEach { status ->
-                DropdownMenuItem(
-                    text = {
-                        Text(
-                            text = status.label,
-                            fontWeight = if (status == current) {
-                                FontWeight.Bold
-                            } else {
-                                FontWeight.Normal
-                            },
-                        )
-                    },
-                    onClick = {
-                        open = false
-                        if (status != current) onPick(status)
-                    },
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun TextAction(
-    label: String,
-    emphasised: Boolean = false,
-    tint: Color = MaterialTheme.colorScheme.primary,
-    onClick: () -> Unit,
-) {
-    Text(
-        text = label,
-        fontSize = 12.sp,
-        fontWeight = if (emphasised) FontWeight.SemiBold else FontWeight.Medium,
-        color = tint,
-        modifier = Modifier
-            .clip(RoundedCornerShape(10.dp))
-            .clickable(onClick = onClick)
-            .padding(horizontal = 8.dp, vertical = 8.dp),
-    )
 }

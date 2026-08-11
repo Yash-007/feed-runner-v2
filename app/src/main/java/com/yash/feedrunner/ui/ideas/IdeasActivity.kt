@@ -7,15 +7,14 @@ import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
 import androidx.lifecycle.lifecycleScope
 import com.yash.feedrunner.data.IdeaBankRepository
-import com.yash.feedrunner.ui.ChatMessage
-import com.yash.feedrunner.ui.ChatRole
-import com.yash.feedrunner.ui.PostIdea
 import com.yash.feedrunner.ui.SeedStatus
 import com.yash.feedrunner.ui.StoredSeed
 import com.yash.feedrunner.ui.theme.FeedRunnerTheme
@@ -30,10 +29,8 @@ internal val StoredSeed.key: String
 /** Everything the Ideas screen renders. */
 data class IdeasUiState(
     val seeds: List<StoredSeed> = emptyList(),
-    val selectedIds: Set<String> = emptySet(),
-    val ideas: List<PostIdea> = emptyList(),
-    /** Themes the model saw across 3 or more seeds, worth treating as lanes. */
-    val emergingLanes: List<String> = emptyList(),
+    /** Seed whose ideation thread is open. Null means the list is showing. */
+    val openSeedKey: String? = null,
     val filter: SeedStatus? = null,
     /** Theme tag to narrow by, applied on top of the status filter. */
     val tagFilter: String? = null,
@@ -42,14 +39,10 @@ data class IdeasUiState(
     val message: String? = null,
     val pendingCount: Int = 0,
     val baseUrl: String = "",
-    /** Card showing its full detail. Null when everything is collapsed. */
-    val expandedSeedKey: String? = null,
-    /** Card with its conversation open. Always also expanded. */
-    val chatSeedKey: String? = null,
-    val chatPendingId: String? = null,
-    /** Failed chat turn, scoped to the seed it belongs to. */
-    val chatError: String? = null,
-    val chatErrorId: String? = null,
+    /** Set while a generation for the open thread is in flight. */
+    val generatingSeedKey: String? = null,
+    /** Failure for the open thread, shown above its composer. */
+    val threadError: String? = null,
     /** Null until the first load answers either way. */
     val serverReachable: Boolean? = null,
     val pendingDelete: StoredSeed? = null,
@@ -70,6 +63,9 @@ data class IdeasUiState(
     /** The status filter is applied server-side; the tag filter is local. */
     val visibleSeeds: List<StoredSeed>
         get() = tagFilter?.let { tag -> seeds.filter { tag in it.seed.themeTags } } ?: seeds
+
+    /** The seed being worked on, if its thread is open. */
+    val openSeed: StoredSeed? get() = seeds.firstOrNull { it.key == openSeedKey }
 }
 
 /** Callbacks the screen invokes, kept in one place so the composable stays dumb. */
@@ -78,18 +74,11 @@ data class IdeasActions(
     val onFilterChange: (SeedStatus?) -> Unit,
     val onTagFilterChange: (String?) -> Unit,
     val onClearFilters: () -> Unit,
-    val onToggleSelect: (StoredSeed) -> Unit,
-    val onClearSelection: () -> Unit,
-    val onToggleExpand: (StoredSeed) -> Unit,
+    val onOpenSeed: (StoredSeed) -> Unit,
     val onSetStatus: (StoredSeed, SeedStatus) -> Unit,
-    val onGenerate: (String) -> Unit,
     val onAddManual: (String) -> Unit,
     val onSetBaseUrl: (String) -> Unit,
     val onCopy: (String) -> Unit,
-    val onClearIdeas: () -> Unit,
-    val onToggleChat: (StoredSeed) -> Unit,
-    val onSendChat: (StoredSeed, String) -> Unit,
-    val onRetryChat: (StoredSeed) -> Unit,
     val onAskDelete: (StoredSeed) -> Unit,
     val onConfirmDelete: (StoredSeed) -> Unit,
     val onCancelDelete: () -> Unit,
@@ -106,9 +95,6 @@ class IdeasActivity : ComponentActivity() {
     private lateinit var repository: IdeaBankRepository
     private var state by mutableStateOf(IdeasUiState())
 
-    /** Kept so a failed chat turn can be retried without retyping it. */
-    private var lastChatMessage: String? = null
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         repository = IdeaBankRepository(this)
@@ -116,36 +102,45 @@ class IdeasActivity : ComponentActivity() {
 
         setContent {
             FeedRunnerTheme {
-                Surface {
-                    IdeasScreen(
-                        state = state,
-                        actions = IdeasActions(
-                            onRefresh = ::refresh,
-                            onFilterChange = ::changeFilter,
-                            onTagFilterChange = { state = state.copy(tagFilter = it) },
-                            onClearFilters = {
-                                state = state.copy(tagFilter = null)
-                                changeFilter(null)
-                            },
-                            onToggleSelect = ::toggleSelect,
-                            onClearSelection = { state = state.copy(selectedIds = emptySet()) },
-                            onToggleExpand = ::toggleExpand,
-                            onSetStatus = ::setStatus,
-                            onGenerate = ::generate,
-                            onAddManual = ::addManual,
-                            onSetBaseUrl = ::setBaseUrl,
+                // targetSdk 35 draws edge to edge, so without this the composer sits
+                // under the navigation bar and the header under the status bar.
+                // safeDrawing covers the keyboard too, which is what a chat wants.
+                Surface(modifier = Modifier.safeDrawingPadding()) {
+                    val open = state.openSeed
+                    if (open != null) {
+                        SeedThreadScreen(
+                            seed = open,
+                            generating = state.generatingSeedKey == open.key,
+                            error = state.threadError,
+                            onBack = { state = state.copy(openSeedKey = null, threadError = null) },
+                            onGenerate = { instruction -> generate(open, instruction) },
+                            onDeleteIdea = { idea -> deleteIdea(open, idea) },
                             onCopy = ::copy,
-                            onClearIdeas = {
-                                state = state.copy(ideas = emptyList(), emergingLanes = emptyList())
-                            },
-                            onToggleChat = ::toggleChat,
-                            onSendChat = ::sendChat,
-                            onRetryChat = ::retryChat,
-                            onAskDelete = { state = state.copy(pendingDelete = it) },
-                            onConfirmDelete = ::delete,
-                            onCancelDelete = { state = state.copy(pendingDelete = null) },
-                        ),
-                    )
+                            onSetStatus = { status -> setStatus(open, status) },
+                            onDeleteSeed = { state = state.copy(pendingDelete = open) },
+                        )
+                    } else {
+                        IdeasScreen(
+                            state = state,
+                            actions = IdeasActions(
+                                onRefresh = ::refresh,
+                                onFilterChange = ::changeFilter,
+                                onTagFilterChange = { state = state.copy(tagFilter = it) },
+                                onClearFilters = {
+                                    state = state.copy(tagFilter = null)
+                                    changeFilter(null)
+                                },
+                                onOpenSeed = ::openSeed,
+                                onSetStatus = ::setStatus,
+                                onAddManual = ::addManual,
+                                onSetBaseUrl = ::setBaseUrl,
+                                onCopy = ::copy,
+                                onAskDelete = { state = state.copy(pendingDelete = it) },
+                                onConfirmDelete = ::delete,
+                                onCancelDelete = { state = state.copy(pendingDelete = null) },
+                            ),
+                        )
+                    }
                 }
             }
         }
@@ -197,24 +192,13 @@ class IdeasActivity : ComponentActivity() {
         refresh()
     }
 
-    private fun toggleSelect(seed: StoredSeed) {
-        val id = seed.remoteId
-        if (id == null) {
+    /** Opens a seed's ideation thread. Needs a server id to generate against. */
+    private fun openSeed(seed: StoredSeed) {
+        if (seed.remoteId == null) {
             toast("That seed has not synced yet")
             return
         }
-        val selected = state.selectedIds.toMutableSet()
-        if (!selected.add(id)) selected.remove(id)
-        state = state.copy(selectedIds = selected)
-    }
-
-    /** Collapsing a card also closes its conversation; nothing stays open offscreen. */
-    private fun toggleExpand(seed: StoredSeed) {
-        val opening = seed.key != state.expandedSeedKey
-        state = state.copy(
-            expandedSeedKey = seed.key.takeIf { opening },
-            chatSeedKey = state.chatSeedKey.takeIf { opening && it == seed.key },
-        )
+        state = state.copy(openSeedKey = seed.key, threadError = null)
     }
 
     private fun setStatus(seed: StoredSeed, status: SeedStatus) {
@@ -224,7 +208,7 @@ class IdeasActivity : ComponentActivity() {
                 onSuccess = { updated ->
                     state = state.copy(seeds = state.seeds.replacing(updated))
                     // A status change can move a seed out of the active filter.
-                    if (state.filter != null) refresh()
+                    if (state.filter != null && state.openSeedKey == null) refresh()
                 },
                 onFailure = { toast(it.message ?: "Could not update") },
             )
@@ -239,9 +223,7 @@ class IdeasActivity : ComponentActivity() {
                 onSuccess = {
                     state = state.copy(
                         seeds = state.seeds.filterNot { it.key == seed.key },
-                        selectedIds = state.selectedIds - seed.remoteId.orEmpty(),
-                        expandedSeedKey = state.expandedSeedKey.takeIf { it != seed.key },
-                        chatSeedKey = state.chatSeedKey.takeIf { it != seed.key },
+                        openSeedKey = state.openSeedKey.takeIf { it != seed.key },
                     )
                 },
                 onFailure = { toast(it.message ?: "Could not delete") },
@@ -249,50 +231,41 @@ class IdeasActivity : ComponentActivity() {
         }
     }
 
-    private fun toggleChat(seed: StoredSeed) {
-        if (seed.remoteId == null) {
-            toast("That seed has not synced yet")
-            return
-        }
-        state = state.copy(chatSeedKey = seed.key.takeIf { it != state.chatSeedKey })
-    }
-
-    private fun sendChat(seed: StoredSeed, message: String) {
-        if (message.isBlank() || state.chatPendingId != null) return
-
-        // Show the typed turn straight away; the server appends both turns once
-        // the model answers, and the response replaces this optimistic copy.
-        lastChatMessage = message
-        val optimistic = seed.copy(chat = seed.chat + ChatMessage(ChatRole.USER, message))
-        state = state.copy(
-            seeds = state.seeds.replacing(optimistic),
-            chatPendingId = seed.remoteId,
-            chatError = null,
-            chatErrorId = null,
-        )
+    /**
+     * Generates for one seed. An empty instruction is a plain generate; anything
+     * typed steers this round and is stored as a turn in the thread.
+     */
+    private fun generate(seed: StoredSeed, instruction: String) {
+        if (state.generatingSeedKey != null) return
+        state = state.copy(generatingSeedKey = seed.key, threadError = null)
 
         lifecycleScope.launch {
-            val outcome = withContext(Dispatchers.IO) { repository.chat(seed, message) }
+            val outcome = withContext(Dispatchers.IO) {
+                repository.generateForSeed(seed, instruction)
+            }
             state = outcome.fold(
-                onSuccess = { state.copy(seeds = state.seeds.replacing(it), chatPendingId = null) },
-                onFailure = { error ->
-                    // Drop the optimistic turn, it never reached the server, and
-                    // show the failure on the card rather than as a toast.
+                onSuccess = {
+                    state.copy(seeds = state.seeds.replacing(it), generatingSeedKey = null)
+                },
+                onFailure = {
                     state.copy(
-                        seeds = state.seeds.replacing(seed),
-                        chatPendingId = null,
-                        chatError = error.message ?: "Chat failed",
-                        chatErrorId = seed.remoteId,
+                        generatingSeedKey = null,
+                        threadError = it.message ?: "Generation failed",
                     )
                 },
             )
         }
     }
 
-    private fun retryChat(seed: StoredSeed) {
-        val message = lastChatMessage ?: return
-        state = state.copy(chatError = null, chatErrorId = null)
-        sendChat(seed, message)
+    /** Removes one generated post. The server keeps the tally of what was cleared. */
+    private fun deleteIdea(seed: StoredSeed, idea: com.yash.feedrunner.ui.SeedIdea) {
+        lifecycleScope.launch {
+            val outcome = withContext(Dispatchers.IO) { repository.deleteIdea(seed, idea.id) }
+            outcome.fold(
+                onSuccess = { state = state.copy(seeds = state.seeds.replacing(it)) },
+                onFailure = { toast(it.message ?: "Could not delete") },
+            )
+        }
     }
 
     /** Swaps in an updated seed, matched on whichever id it has. */
@@ -303,28 +276,6 @@ class IdeasActivity : ComponentActivity() {
             updated
         } else {
             seed
-        }
-    }
-
-    private fun generate(steer: String) {
-        val chosen = state.seeds.filter { it.remoteId in state.selectedIds }
-        if (chosen.isEmpty()) return
-
-        state = state.copy(generating = true, message = null)
-        lifecycleScope.launch {
-            val outcome = withContext(Dispatchers.IO) { repository.generateIdeas(chosen, steer) }
-            state = outcome.fold(
-                onSuccess = {
-                    state.copy(
-                        ideas = it.ideas,
-                        emergingLanes = it.emergingLanes,
-                        generating = false,
-                    )
-                },
-                onFailure = {
-                    state.copy(generating = false, message = it.message ?: "Generation failed")
-                },
-            )
         }
     }
 

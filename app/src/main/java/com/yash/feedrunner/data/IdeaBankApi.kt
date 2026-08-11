@@ -5,6 +5,7 @@ import com.yash.feedrunner.ui.ChatMessage
 import com.yash.feedrunner.ui.ChatRole
 import com.yash.feedrunner.ui.IdeaSeed
 import com.yash.feedrunner.ui.PostIdea
+import com.yash.feedrunner.ui.SeedIdea
 import com.yash.feedrunner.ui.SeedSource
 import com.yash.feedrunner.ui.SeedStatus
 import com.yash.feedrunner.ui.StoredSeed
@@ -70,6 +71,21 @@ class IdeaBankApi(private val config: BackendConfig) {
 
     fun deleteSeed(remoteId: String) {
         request("DELETE", "/seeds/$remoteId", null)
+    }
+
+    /** Generates from one seed. Empty instruction means "just generate". */
+    fun generateForSeed(remoteId: String, instruction: String): StoredSeed {
+        val payload = JSONObject().put("instruction", instruction)
+        val body = request("POST", "/seeds/$remoteId/ideas", payload)
+        return body.optJSONObject("seed")?.toRemoteSeed()
+            ?: throw IdeaBankException("Server did not return the thread")
+    }
+
+    /** Removes one generated post. The server keeps a tally of what was cleared. */
+    fun deleteIdea(remoteId: String, ideaId: String): StoredSeed {
+        val body = request("DELETE", "/seeds/$remoteId/ideas/$ideaId", null)
+        return body.optJSONObject("seed")?.toRemoteSeed()
+            ?: throw IdeaBankException("Server did not return the thread")
     }
 
     /** Idempotent: re-copying the same draft updates the one row. */
@@ -203,8 +219,36 @@ private fun JSONObject.toRemoteSeed(): StoredSeed? = runCatching {
         postText = optString("post_text"),
         createdAtMillis = parseTimestamp(optString("created_at")),
         chat = optJSONArray("chat").toChatMessages(),
+        ideas = optJSONArray("ideas").toSeedIdeas(),
+        lanes = optJSONArray("lanes").toStrings(),
+        rounds = optInt("rounds"),
     )
 }.getOrNull()
+
+private fun JSONArray?.toSeedIdeas(): List<SeedIdea> {
+    if (this == null) return emptyList()
+    return (0 until length()).mapNotNull { i ->
+        val item = optJSONObject(i) ?: return@mapNotNull null
+        val text = item.optString("post_text").takeIf { it.isNotBlank() }
+            ?: return@mapNotNull null
+        SeedIdea(
+            id = item.optString("id"),
+            postText = text,
+            play = item.optString("play"),
+            register = item.optString("register"),
+            lane = item.optString("lane"),
+            thought = item.optString("thought"),
+            whyNow = item.optString("why_now"),
+            round = item.optInt("round"),
+            atMillis = parseTimestamp(item.optString("at")),
+        )
+    }
+}
+
+private fun JSONArray?.toStrings(): List<String> {
+    if (this == null) return emptyList()
+    return (0 until length()).mapNotNull { optString(it).takeIf { s -> s.isNotEmpty() } }
+}
 
 private fun JSONArray?.toChatMessages(): List<ChatMessage> {
     if (this == null) return emptyList()
@@ -215,7 +259,7 @@ private fun JSONArray?.toChatMessages(): List<ChatMessage> {
         } else {
             ChatRole.USER
         }
-        ChatMessage(role, item.optString("text"))
+        ChatMessage(role, item.optString("text"), parseTimestamp(item.optString("at")))
     }
 }
 

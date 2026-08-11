@@ -202,6 +202,19 @@ class IdeaBankRepository(context: Context) {
         return runCatching { api.clearChat(id) }
     }
 
+    /** Generates from a single seed, optionally steered. Needs the backend. */
+    fun generateForSeed(seed: StoredSeed, instruction: String): Result<StoredSeed> {
+        val id = seed.remoteId
+            ?: return Result.failure(IdeaBankException("Not synced yet, needs the backend"))
+        return runCatching { api.generateForSeed(id, instruction) }
+    }
+
+    fun deleteIdea(seed: StoredSeed, ideaId: String): Result<StoredSeed> {
+        val id = seed.remoteId
+            ?: return Result.failure(IdeaBankException("Not synced yet, needs the backend"))
+        return runCatching { api.deleteIdea(id, ideaId) }
+    }
+
     fun generateIdeas(seeds: List<StoredSeed>, steer: String): Result<IdeaBankApi.Ideation> {
         val ids = seeds.mapNotNull { it.remoteId }
         if (ids.isEmpty()) {

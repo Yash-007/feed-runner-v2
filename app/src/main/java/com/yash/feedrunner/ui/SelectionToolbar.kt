@@ -72,14 +72,17 @@ internal data class SelectionActions(
  * gets Copy and Select all.
  */
 @Composable
-internal fun SelectionActionsHost(content: @Composable () -> Unit) {
+internal fun SelectionActionsHost(
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit,
+) {
     var actions by remember { mutableStateOf<SelectionActions?>(null) }
     val toolbar = remember {
         OverlayTextToolbar(onShow = { actions = it }, onHide = { actions = null })
     }
 
     CompositionLocalProvider(LocalTextToolbar provides toolbar) {
-        Box {
+        Box(modifier = modifier) {
             content()
             actions?.let { current ->
                 Row(
