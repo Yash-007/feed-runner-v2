@@ -172,6 +172,7 @@ class ResultStore(private val context: Context) {
                 JSONObject().apply {
                     put("role", message.role.name)
                     put("text", message.text)
+                    message.angle?.let { put("angle", it.name) }
                 },
             )
         }
@@ -183,7 +184,12 @@ class ResultStore(private val context: Context) {
             val item = optJSONObject(i) ?: return@mapNotNull null
             val role = runCatching { ChatRole.valueOf(item.getString("role")) }.getOrNull()
                 ?: return@mapNotNull null
-            ChatMessage(role, item.optString("text"))
+            ChatMessage(
+                role = role,
+                text = item.optString("text"),
+                angle = item.optString("angle").takeIf { it.isNotEmpty() }
+                    ?.let { name -> runCatching { Angle.valueOf(name) }.getOrNull() },
+            )
         }
     }
 

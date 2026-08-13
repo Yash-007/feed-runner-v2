@@ -6,16 +6,31 @@ import androidx.compose.ui.graphics.Color
  * The angle a suggested reply takes. Duplicates across the four drafts are
  * expected — a good banter post can earn three different jokes.
  */
-enum class Angle(val label: String, val color: Color) {
-    ADD("ADD", Color(0xFF1D9BF0)),
-    PUSH_BACK("PUSH BACK", Color(0xFFE0245E)),
-    EXTEND("EXTEND", Color(0xFF7856FF)),
-    BANTER("BANTER", Color(0xFFF5A623)),
-    RELATE("RELATE", Color(0xFF00BA7C)),
-    ASK("ASK", Color(0xFF00B8D9)),
-    APPRECIATE("APPRECIATE", Color(0xFFFF6B9D)),
-    HUMAN("HUMAN", Color(0xFF8B98A5)),
+enum class Angle(val label: String, val chipLabel: String, val color: Color) {
+    ADD("ADD", "add", Color(0xFF1D9BF0)),
+    PUSH_BACK("PUSH BACK", "push back", Color(0xFFE0245E)),
+    EXTEND("EXTEND", "extend", Color(0xFF7856FF)),
+    BANTER("BANTER", "funnier", Color(0xFFF5A623)),
+    RELATE("RELATE", "relate", Color(0xFF00BA7C)),
+    ASK("ASK", "ask", Color(0xFF00B8D9)),
+    APPRECIATE("APPRECIATE", "appreciate", Color(0xFFFF6B9D)),
+    HUMAN("HUMAN", "human", Color(0xFF8B98A5)),
 }
+
+/**
+ * Angles offered as one-tap batches in the reply chat.
+ *
+ * BANTER leads as "funnier" because that is what you reach for most; ASK is here
+ * because a sharp question is the best chance of a reply from the author.
+ */
+val BATCH_ANGLES = listOf(
+    Angle.BANTER,
+    Angle.ADD,
+    Angle.EXTEND,
+    Angle.PUSH_BACK,
+    Angle.APPRECIATE,
+    Angle.ASK,
+)
 
 /**
  * One-tap rewrites. [instruction] is what actually reaches the model, so the
@@ -95,7 +110,16 @@ enum class ChatRole { USER, ASSISTANT }
  * One chat turn. [atMillis] is only set for seed threads, where messages and
  * generated ideas share one timeline and have to be ordered against each other.
  */
-data class ChatMessage(val role: ChatRole, val text: String, val atMillis: Long = 0L)
+data class ChatMessage(
+    val role: ChatRole,
+    val text: String,
+    val atMillis: Long = 0L,
+    /**
+     * Set when this turn came from tapping an angle chip, so the bubble can show
+     * which angle it is. Null for ordinary chat.
+     */
+    val angle: Angle? = null,
+)
 
 /** The most recent analysis, persisted so it can be reopened for free. */
 data class StoredResult(

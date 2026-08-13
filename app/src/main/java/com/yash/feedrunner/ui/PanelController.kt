@@ -69,6 +69,9 @@ class PanelController(
     /** Kept so a failed chat turn can be retried without retyping it. */
     private var lastChatMessage: String? = null
 
+    /** Set instead when the last turn came from an angle chip, so retry repeats it. */
+    private var lastAngle: Angle? = null
+
     /** Bumped on every dismiss so a late response can't write into a closed panel. */
     private var generation = 0
 
@@ -176,6 +179,7 @@ class PanelController(
                     onSelectResult = ::selectResult,
                     onSendChat = ::sendChat,
                     onRetryChat = ::retryChat,
+                    onAngleBatch = ::moreInAngle,
                     onCopyText = ::copyText,
                     onChatFocusChanged = window::setFocusable,
                     onRetry = ::dismiss,
@@ -240,6 +244,7 @@ class PanelController(
         val resultId = currentResultId
         resultId?.let { resultStore.updateChat(it, withUserTurn) }
         lastChatMessage = message
+        lastAngle = null
 
         val voiceRules = voiceRulesStore.rules
         val drafts = ready.drafts
@@ -286,8 +291,75 @@ class PanelController(
         }
     }
 
+    /**
+     * Six fresh replies, all taking one angle, appended to the chat.
+     *
+     * They land as chat turns rather than replacing the six drafts above: the
+     * originals are often still the ones worth sending, and losing them to a chip
+     * tap would be the wrong trade.
+     */
+    private fun moreInAngle(angle: Angle) {
+        val client = claude ?: return
+        val activeContext = postContext ?: return
+        val ready = state as? PanelState.Ready ?: return
+        if (ready.chatPending) return
+
+        val request = ChatMessage(ChatRole.USER, "more ${angle.label}")
+        val withRequest = ready.chat + request
+        state = ready.copy(chat = withRequest, chatPending = true, chatError = null)
+
+        val resultId = currentResultId
+        resultId?.let { resultStore.updateChat(it, withRequest) }
+        // A retry re-runs the same angle rather than sending the label as text.
+        lastChatMessage = null
+        lastAngle = angle
+
+        val voiceRules = voiceRulesStore.rules
+        val drafts = ready.drafts
+
+        worker.execute {
+            val outcome = runCatching {
+                client.repliesInAngle(angle, activeContext, drafts, voiceRules)
+            }
+
+            handler.post {
+                outcome
+                    .onSuccess { replies ->
+                        val withReplies = withRequest + replies.map {
+                            ChatMessage(ChatRole.ASSISTANT, it.text, angle = angle)
+                        }
+                        resultId?.let { resultStore.updateChat(it, withReplies) }
+
+                        val current = state as? PanelState.Ready
+                        if (current != null && currentResultId == resultId) {
+                            state = current.copy(chat = withReplies, chatPending = false)
+                        }
+                    }
+                    .onFailure { error ->
+                        Log.w(TAG, "Angle batch failed", error)
+                        val current = state as? PanelState.Ready
+                        if (current != null && currentResultId == resultId) {
+                            state = current.copy(
+                                chatPending = false,
+                                chatError = userMessage(error),
+                            )
+                        }
+                    }
+            }
+        }
+    }
+
     /** Re-sends the last chat turn after a failure, dropping the failed user turn. */
     private fun retryChat() {
+        lastAngle?.let { angle ->
+            val ready = state as? PanelState.Ready ?: return
+            state = ready.copy(
+                chat = ready.chat.dropLastWhile { it.role == ChatRole.USER },
+                chatError = null,
+            )
+            moreInAngle(angle)
+            return
+        }
         val message = lastChatMessage ?: return
         val ready = state as? PanelState.Ready ?: return
         // Drop the user turn the failed attempt added, so the retry does not

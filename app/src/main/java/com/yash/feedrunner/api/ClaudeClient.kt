@@ -170,6 +170,71 @@ class ClaudeClient(apiKey: String) {
     }
 
     /**
+     * A fresh batch of replies all taking one angle.
+     *
+     * Reuses the analyze tool, forced, rather than declaring a narrower one: tools
+     * render ahead of the system prompt in the cached prefix, so a new tool here
+     * would cost a full cache write every time a chip is tapped. The post context
+     * comes back too and is simply ignored.
+     */
+    fun repliesInAngle(
+        angle: Angle,
+        postContext: PostContext,
+        existing: List<Draft>,
+        extraVoiceRules: String,
+    ): List<Draft> {
+        val instruction = buildString {
+            append("The post being replied to, by ").append(postContext.author)
+            append(" (").append(postContext.authorType)
+            append(", ").append(postContext.registerLabel)
+            append(", ").append(postContext.language).append("):\n")
+            append('"').append(postContext.postText).append("\"\n\n")
+            append("Drafts already suggested, do not repeat these or restate them:\n")
+            existing.forEach { draft ->
+                append("- [").append(draft.angle.label).append("] ").append(draft.text).append('\n')
+            }
+            append("\nNow give me six more replies, and make every one of them ")
+            append(angle.name).append(". Six genuinely different ")
+            append(angle.name).append(" replies: different entry points, different ")
+            append("specifics, not one thought rephrased six ways. Set the angle field ")
+            append("to ").append(angle.name).append(" on all six.\n")
+            append("The usual composition rules about mixing angles and registers do ")
+            append("not apply to this request, the angle is fixed. Every other voice ")
+            append("rule still applies.\n")
+            append("Return post_context as before. Set idea_seed to null.")
+        }
+
+        val params = MessageCreateParams.builder()
+            .model(MODEL)
+            .maxTokens(MAX_TOKENS)
+            .thinking(ThinkingConfigDisabled.builder().build())
+            .systemOfTextBlockParams(systemBlocks(extraVoiceRules))
+            .addTool(draftsTool())
+            .toolChoice(
+                ToolChoice.ofTool(ToolChoiceTool.builder().name(TOOL_NAME).build()),
+            )
+            .addUserMessage(instruction)
+            .build()
+
+        val response = client.messages().create(params)
+        logUsage("angle:${angle.name}", response)
+        requireNotRefused(response.stopReason().map { it.toString() }.orElse(""))
+
+        val toolInput = response.content()
+            .firstNotNullOfOrNull { block -> block.toolUse().orElse(null) }
+            ?._input()
+            ?: throw ClaudeException("No replies came back. Try again.")
+
+        @Suppress("UNCHECKED_CAST")
+        val fields = runCatching { toolInput.convert(Map::class.java) as Map<String, Any?> }
+            .getOrNull()
+            ?: throw ClaudeException("Could not read Claude's reply. Try again.")
+
+        // The angle is fixed by the request, so trust it over whatever came back.
+        return parseAnalysis(fields).drafts.map { it.copy(angle = angle) }
+    }
+
+    /**
      * Drafts an original post about the capture, or a quote post on top of it.
      *
      * [userText] is passed through as-is: the prompt decides whether it reads as a

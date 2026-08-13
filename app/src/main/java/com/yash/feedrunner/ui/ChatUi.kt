@@ -68,6 +68,9 @@ internal fun ChatThread(
     onSend: (String) -> Unit,
     onRetry: () -> Unit,
     onFocusChanged: (Boolean) -> Unit,
+    /** Angles offered as one-tap batches. Empty hides the row. */
+    angles: List<Angle> = emptyList(),
+    onAngleBatch: (Angle) -> Unit = {},
 ) {
     var input by remember { mutableStateOf("") }
     var copiedIndex by remember { mutableIntStateOf(-1) }
@@ -100,6 +103,13 @@ internal fun ChatThread(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
+        }
+
+        // Angle chips stay put rather than disappearing once the chat starts: they
+        // are the fastest way to ask for a different kind of reply, and wanting one
+        // is not limited to the first turn.
+        if (angles.isNotEmpty()) {
+            AngleChips(angles = angles, enabled = !pending, onPick = onAngleBatch)
         }
 
         if (chat.isEmpty() && !pending) {
@@ -202,6 +212,37 @@ internal fun FollowChatGrowth(scrollState: ScrollState, chatSize: Int, resetKey:
     }
 }
 
+/**
+ * One tap per angle, each producing a fresh batch of replies in that angle.
+ *
+ * Coloured to match the draft cards above, so "another six BANTER" is recognisable
+ * without reading the label.
+ */
+@Composable
+private fun AngleChips(angles: List<Angle>, enabled: Boolean, onPick: (Angle) -> Unit) {
+    Row(
+        modifier = Modifier
+            .padding(bottom = 10.dp)
+            .horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        angles.forEach { angle ->
+            val alpha = if (enabled) 1f else 0.4f
+            Text(
+                text = angle.chipLabel,
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = angle.color.copy(alpha = alpha),
+                modifier = Modifier
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(angle.color.copy(alpha = 0.14f * alpha))
+                    .clickable(enabled = enabled) { onPick(angle) }
+                    .padding(horizontal = 12.dp, vertical = 7.dp),
+            )
+        }
+    }
+}
+
 /** One-tap starters, shown only before the conversation begins. */
 @Composable
 private fun QuickPrompts(prompts: List<String>, onPick: (String) -> Unit) {
@@ -276,6 +317,20 @@ private fun ChatBubble(
             .padding(vertical = 4.dp),
         horizontalAlignment = if (fromUser) Alignment.End else Alignment.Start,
     ) {
+        message.angle?.takeIf { !fromUser }?.let { angle ->
+            Text(
+                text = angle.label,
+                fontSize = 8.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color.White,
+                modifier = Modifier
+                    .padding(bottom = 3.dp)
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(angle.color)
+                    .padding(horizontal = 5.dp, vertical = 1.dp),
+            )
+        }
+
         Surface(
             shape = shape,
             color = if (fromUser) {

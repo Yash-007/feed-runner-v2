@@ -82,6 +82,7 @@ fun ReplyPanel(
     onSelectResult: (savedAtMillis: Long) -> Unit,
     onSendChat: (String) -> Unit,
     onRetryChat: () -> Unit,
+    onAngleBatch: (Angle) -> Unit,
     onCopyText: (String) -> Unit,
     onChatFocusChanged: (Boolean) -> Unit,
     onRetry: () -> Unit,
@@ -133,6 +134,7 @@ fun ReplyPanel(
                         onViewCapture = { viewerPath = it },
                         onSendChat = onSendChat,
                         onRetryChat = onRetryChat,
+                        onAngleBatch = onAngleBatch,
                         onCopyText = onCopyText,
                         onChatFocusChanged = { focused ->
                             chatFocused = focused
@@ -214,6 +216,7 @@ private fun ReadyBody(
     onViewCapture: (path: String) -> Unit,
     onSendChat: (String) -> Unit,
     onRetryChat: () -> Unit,
+    onAngleBatch: (Angle) -> Unit,
     onCopyText: (String) -> Unit,
     onChatFocusChanged: (Boolean) -> Unit,
     onScrollState: (ScrollState) -> Unit,
@@ -287,12 +290,14 @@ private fun ReadyBody(
                 chat = state.chat,
                 pending = state.chatPending,
                 quickPrompts = REPLY_QUICK_PROMPTS,
-                title = "Ask for anything else",
+                title = "More replies, or ask for anything",
                 error = state.chatError,
                 onCopyText = onCopyText,
                 onSend = onSendChat,
                 onRetry = onRetryChat,
                 onFocusChanged = onChatFocusChanged,
+                angles = BATCH_ANGLES,
+                onAngleBatch = onAngleBatch,
             )
         }
 
