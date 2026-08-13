@@ -121,19 +121,17 @@ internal fun ChatThread(
         // and a selection can run across messages. The previous per-bubble version
         // needed one long press to arm selection and a second to begin it, which is
         // what made selecting text feel broken.
-        SelectionActionsHost {
-            SelectionContainer {
-                Column {
-                    chat.forEachIndexed { index, message ->
-                        ChatBubble(
-                            message = message,
-                            copied = copiedIndex == index,
-                            onCopy = {
-                                onCopyText(message.text)
-                                copiedIndex = index
-                            },
-                        )
-                    }
+        SelectionContainer {
+            Column {
+                chat.forEachIndexed { index, message ->
+                    ChatBubble(
+                        message = message,
+                        copied = copiedIndex == index,
+                        onCopy = {
+                            onCopyText(message.text)
+                            copiedIndex = index
+                        },
+                    )
                 }
             }
         }

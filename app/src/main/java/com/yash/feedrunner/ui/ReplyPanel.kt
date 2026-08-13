@@ -118,7 +118,11 @@ fun ReplyPanel(
                 // Swallow taps on the sheet so they don't reach the scrim.
                 .clickable(enabled = false) {},
         ) {
-            Box {
+            // One host for the whole sheet: the drafts, the chat bubbles and the
+            // composer all need the same toolbar, and an overlay window gets none
+            // from the platform.
+            SelectionActionsHost {
+              Box {
               Column(modifier = Modifier.padding(16.dp)) {
                 PanelHeader(onDismiss = onDismiss)
 
@@ -152,6 +156,7 @@ fun ReplyPanel(
                       onClick = { scope.launch { scroll.animateScrollTo(scroll.maxValue) } },
                       modifier = Modifier.align(Alignment.BottomEnd),
                   )
+              }
               }
             }
         }

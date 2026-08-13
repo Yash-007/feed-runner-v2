@@ -5,6 +5,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
@@ -18,26 +19,33 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInWindow
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalTextToolbar
 import androidx.compose.ui.platform.TextToolbar
 import androidx.compose.ui.platform.TextToolbarStatus
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import kotlin.math.roundToInt
 
 /**
- * Text selection actions for the overlay panels.
+ * Text selection and editing actions for the overlay panels.
  *
- * Android's own floating Copy / Select all bar is an `ActionMode`, which needs an
- * Activity window host. The panels are `TYPE_APPLICATION_OVERLAY` windows, so
- * selecting text worked but no toolbar ever appeared, leaving selection with no way
- * to act on it. This supplies the same actions as ordinary content instead.
+ * Android's Cut / Copy / Paste / Select all bar is an `ActionMode`, which needs an
+ * Activity window to host it. The panels are `TYPE_APPLICATION_OVERLAY` windows, so
+ * selection worked but no toolbar ever appeared: text could be selected and then
+ * not acted on, and there was no way to paste into a composer at all. This supplies
+ * the same actions.
  *
- * The bar sits at a fixed spot above the content rather than chasing the selection
- * rectangle: predictable, and it cannot end up off screen or under the keyboard.
+ * Which actions appear is decided by Compose, which passes only the callbacks that
+ * apply: no copy without a selection, no paste without something on the clipboard.
  */
 private class OverlayTextToolbar(
-    private val onShow: (SelectionActions) -> Unit,
+    private val onShow: (SelectionRequest) -> Unit,
     private val onHide: () -> Unit,
 ) : TextToolbar {
 
@@ -52,7 +60,15 @@ private class OverlayTextToolbar(
         onSelectAllRequested: (() -> Unit)?,
     ) {
         status = TextToolbarStatus.Shown
-        onShow(SelectionActions(copy = onCopyRequested, selectAll = onSelectAllRequested))
+        onShow(
+            SelectionRequest(
+                rect = rect,
+                copy = onCopyRequested,
+                paste = onPasteRequested,
+                cut = onCutRequested,
+                selectAll = onSelectAllRequested,
+            ),
+        )
     }
 
     override fun hide() {
@@ -61,44 +77,77 @@ private class OverlayTextToolbar(
     }
 }
 
-/** The subset of selection actions worth offering for read-only chat text. */
-internal data class SelectionActions(
+/** What to offer, and where the selection is, in window coordinates. */
+internal data class SelectionRequest(
+    val rect: Rect,
     val copy: (() -> Unit)?,
+    val paste: (() -> Unit)?,
+    val cut: (() -> Unit)?,
     val selectAll: (() -> Unit)?,
 )
 
 /**
- * Hosts [content] with a working selection toolbar. Any [SelectionContainer] inside
- * gets Copy and Select all.
+ * Hosts [content] with a working selection toolbar, for both read-only text and
+ * text fields. Anything selectable or editable inside gets the bar.
  */
 @Composable
 internal fun SelectionActionsHost(
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit,
 ) {
-    var actions by remember { mutableStateOf<SelectionActions?>(null) }
+    var request by remember { mutableStateOf<SelectionRequest?>(null) }
+    var hostOrigin by remember { mutableStateOf(Offset.Zero) }
+    var barSize by remember { mutableStateOf(IntOffset.Zero) }
+    val density = LocalDensity.current
+
     val toolbar = remember {
-        OverlayTextToolbar(onShow = { actions = it }, onHide = { actions = null })
+        OverlayTextToolbar(onShow = { request = it }, onHide = { request = null })
     }
 
     CompositionLocalProvider(LocalTextToolbar provides toolbar) {
-        Box(modifier = modifier) {
+        Box(
+            modifier = modifier.onGloballyPositioned { hostOrigin = it.positionInWindow() },
+        ) {
             content()
-            actions?.let { current ->
+
+            request?.let { current ->
+                val gap = with(density) { 8.dp.toPx() }
+                // Sit just above the selection, like the platform bar, and fall
+                // below it when the selection is near the top of the panel.
+                val localTop = current.rect.top - hostOrigin.y
+                val above = localTop - barSize.y - gap
+                val y = if (above >= 0f) above else current.rect.bottom - hostOrigin.y + gap
+                val x = (current.rect.left - hostOrigin.x).coerceAtLeast(0f)
+
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(4.dp),
-                    modifier = Modifier.padding(top = 2.dp),
+                    modifier = Modifier
+                        .offset { IntOffset(x.roundToInt(), y.roundToInt()) }
+                        .onGloballyPositioned {
+                            barSize = IntOffset(it.size.width, it.size.height)
+                        },
                 ) {
+                    current.cut?.let { cut ->
+                        ToolbarAction("Cut") {
+                            cut()
+                            toolbar.hide()
+                        }
+                    }
                     current.copy?.let { copy ->
-                        ToolbarAction(label = "Copy") {
+                        ToolbarAction("Copy") {
                             copy()
                             toolbar.hide()
                         }
                     }
-                    current.selectAll?.let { selectAll ->
-                        ToolbarAction(label = "Select all", onClick = selectAll)
+                    current.paste?.let { paste ->
+                        ToolbarAction("Paste") {
+                            paste()
+                            toolbar.hide()
+                        }
                     }
-                    ToolbarAction(label = "Done") { toolbar.hide() }
+                    current.selectAll?.let { selectAll ->
+                        ToolbarAction("Select all", onClick = selectAll)
+                    }
                 }
             }
         }

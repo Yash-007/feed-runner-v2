@@ -137,6 +137,7 @@ fun RepostPanel(
                 .imePadding()
                 .clickable(enabled = false) {},
         ) {
+            SelectionActionsHost {
             Box {
                 Column(
                     modifier = Modifier
@@ -227,6 +228,7 @@ fun RepostPanel(
                     onClick = { scope.launch { scrollState.animateScrollTo(scrollState.maxValue) } },
                     modifier = Modifier.align(Alignment.BottomEnd),
                 )
+            }
             }
         }
 
