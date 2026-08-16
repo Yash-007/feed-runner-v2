@@ -75,6 +75,13 @@ fun IdeasScreen(state: IdeasUiState, actions: IdeasActions) {
             onEditAddress = { showAddressDialog = true },
         )
 
+        state.streak?.let { streak ->
+            StreakCard(
+                streak = streak,
+                modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+            )
+        }
+
         FilterBar(
             status = state.filter,
             tag = state.tagFilter,
@@ -136,7 +143,8 @@ fun IdeasScreen(state: IdeasUiState, actions: IdeasActions) {
     if (showManualDialog) {
         TextEntryDialog(
             title = "Add your own idea",
-            label = "the idea, in your words",
+            supporting = "It joins the bank, and opens so you can generate from it.",
+            label = "the post you want to write",
             confirm = "Add",
             onDismiss = { showManualDialog = false },
             onConfirm = {
@@ -321,7 +329,9 @@ private fun BottomBar(onAddManual: () -> Unit) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.weight(1f),
             )
-            OutlinedButton(onClick = onAddManual) { Text("Add mine") }
+            // Your own ideas belong in the same bank as the captured ones, so this
+            // sits next to them rather than behind a menu.
+            Button(onClick = onAddManual) { Text("+  My own idea") }
         }
     }
 }

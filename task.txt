@@ -1,1 +1,3 @@
 1. the writing, selecting, copying, etc experience of each message chat bar is very bad while writing anything (accross everywhere like replies, repost, post, seed idea creation, etc). we need to fix this and make as good as possible. pls open x and see how their ux while writing anything that is. we need to make exactly like that
+2. in the post section. also give me an option to add my own idea. so i an later work on that as well as other ideas.
+3. pls add one streak feature in the app where it will show the no. of replies i've done daily. so i'll motivate me in some way. make sure ui ux is modern, elegant and attractive. 

@@ -17,6 +17,7 @@ import androidx.lifecycle.lifecycleScope
 import com.yash.feedrunner.data.IdeaBankRepository
 import com.yash.feedrunner.ui.SeedStatus
 import com.yash.feedrunner.ui.StoredSeed
+import com.yash.feedrunner.ui.Streak
 import com.yash.feedrunner.ui.theme.FeedRunnerTheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -46,6 +47,8 @@ data class IdeasUiState(
     /** Null until the first load answers either way. */
     val serverReachable: Boolean? = null,
     val pendingDelete: StoredSeed? = null,
+    /** Null until the first load; the card is hidden rather than showing zeros. */
+    val streak: Streak? = null,
 ) {
     val backendConfigured: Boolean get() = baseUrl.isNotEmpty()
 
@@ -161,6 +164,7 @@ class IdeasActivity : ComponentActivity() {
         lifecycleScope.launch {
             val outcome = withContext(Dispatchers.IO) { repository.loadSeeds(filter) }
             val pending = withContext(Dispatchers.IO) { repository.pendingCount }
+            val streak = withContext(Dispatchers.IO) { repository.loadStreak().getOrNull() }
 
             state = outcome.fold(
                 onSuccess = { seeds ->
@@ -169,6 +173,7 @@ class IdeasActivity : ComponentActivity() {
                         loading = false,
                         pendingCount = pending,
                         serverReachable = true,
+                        streak = streak ?: state.streak,
                     )
                 },
                 onFailure = { error ->
@@ -279,10 +284,23 @@ class IdeasActivity : ComponentActivity() {
         }
     }
 
+    /**
+     * Saves a hand-typed idea and opens its thread, so "add my own idea" lands you
+     * straight in the place where you work on it rather than back in the list.
+     */
     private fun addManual(note: String) {
         lifecycleScope.launch {
-            withContext(Dispatchers.IO) { repository.addManual(note) }
-            refresh()
+            val clientSeedId = withContext(Dispatchers.IO) { repository.addManual(note) }
+            val outcome = withContext(Dispatchers.IO) { repository.loadSeeds(state.filter) }
+            val seeds = outcome.getOrElse {
+                withContext(Dispatchers.IO) { repository.queuedSeeds() }
+            }
+            val added = seeds.firstOrNull { it.clientSeedId == clientSeedId }
+            state = state.copy(
+                seeds = seeds,
+                // Only synced seeds can generate, so a queued one stays in the list.
+                openSeedKey = added?.takeIf { it.remoteId != null }?.key,
+            )
         }
     }
 

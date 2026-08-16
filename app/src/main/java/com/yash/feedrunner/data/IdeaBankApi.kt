@@ -5,7 +5,9 @@ import com.yash.feedrunner.ui.ChatMessage
 import com.yash.feedrunner.ui.ChatRole
 import com.yash.feedrunner.ui.IdeaSeed
 import com.yash.feedrunner.ui.PostIdea
+import com.yash.feedrunner.ui.DayCount
 import com.yash.feedrunner.ui.SeedIdea
+import com.yash.feedrunner.ui.Streak
 import com.yash.feedrunner.ui.SeedSource
 import com.yash.feedrunner.ui.SeedStatus
 import com.yash.feedrunner.ui.StoredSeed
@@ -71,6 +73,21 @@ class IdeaBankApi(private val config: BackendConfig) {
 
     fun deleteSeed(remoteId: String) {
         request("DELETE", "/seeds/$remoteId", null)
+    }
+
+    fun streak(): Streak {
+        val body = request("GET", "/streak", null)
+        val array = body.optJSONArray("days")
+        return Streak(
+            today = body.optInt("today"),
+            current = body.optInt("current_streak"),
+            longest = body.optInt("longest_streak"),
+            total = body.optInt("total"),
+            days = (0 until (array?.length() ?: 0)).mapNotNull { i ->
+                val item = array?.optJSONObject(i) ?: return@mapNotNull null
+                DayCount(item.optString("date"), item.optInt("count"))
+            },
+        )
     }
 
     /** Generates from one seed. Empty instruction means "just generate". */

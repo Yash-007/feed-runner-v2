@@ -7,6 +7,7 @@ import com.yash.feedrunner.ui.PostIdea
 import com.yash.feedrunner.ui.SeedSource
 import com.yash.feedrunner.ui.SeedStatus
 import com.yash.feedrunner.ui.StoredSeed
+import com.yash.feedrunner.ui.Streak
 import java.util.concurrent.Executors
 
 /**
@@ -65,15 +66,22 @@ class IdeaBankRepository(context: Context) {
         flushAsync()
     }
 
-    /** Queues a hand-typed idea. Same path as a model seed, so it also survives offline. */
-    fun addManual(note: String) {
+    fun loadStreak(): Result<Streak> = runCatching { api.streak() }
+
+    /**
+     * Queues a hand-typed idea and returns its client id, so the caller can open
+     * the new seed once it syncs. Same path as a model seed, so it survives
+     * offline too.
+     */
+    fun addManual(note: String): String? {
         val trimmed = note.trim()
-        if (trimmed.isEmpty()) return
+        if (trimmed.isEmpty()) return null
         val now = System.currentTimeMillis()
+        val clientSeedId = "manual-$now"
         outbox.add(
             StoredSeed(
                 remoteId = null,
-                clientSeedId = "manual-$now",
+                clientSeedId = clientSeedId,
                 source = SeedSource.MANUAL,
                 status = SeedStatus.NEW,
                 seed = IdeaSeed(),
@@ -81,7 +89,9 @@ class IdeaBankRepository(context: Context) {
                 createdAtMillis = now,
             ),
         )
-        flushAsync()
+        // Synchronous so the caller can open the seed's thread straight after.
+        flush()
+        return clientSeedId
     }
 
     /**

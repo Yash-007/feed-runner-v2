@@ -118,3 +118,20 @@ data class PostIdea(
     val playLabel: String get() = play.lowercase().replace('_', ' ')
     val registerLabel: String get() = register.lowercase().replace('_', ' ')
 }
+
+/** One day's reply tally in the streak strip. */
+data class DayCount(val date: String, val count: Int)
+
+/**
+ * The daily reply habit, derived from picks: copying a draft is the only moment
+ * the app can observe a reply actually being used.
+ */
+data class Streak(
+    val today: Int = 0,
+    val current: Int = 0,
+    val longest: Int = 0,
+    val total: Int = 0,
+    val days: List<DayCount> = emptyList(),
+) {
+    val busiestDay: Int get() = days.maxOfOrNull { it.count } ?: 0
+}
