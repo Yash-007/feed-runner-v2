@@ -68,30 +68,30 @@ Earlier asks, all shipped: chat bar writing/selecting/copying everywhere,
 
 ## F. Ideas screen
 
-  [ ] F1  Streak card: today's count, run, fourteen bars, best and all time
+  [x] F1  Streak card: today's count, run, fourteen bars, best and all time
   [ ] F2  Streak survives the backend being unreachable, and counts a fresh pick
   [ ] F3  server dot reflects reachability, Set address dialog fixes a moved laptop
-  [ ] F4  Status filters (all, new, posted, skipped) and topic chips both filter
-  [ ] F5  Clear filters shows when a filter hides everything
-  [ ] F6  Pull down refreshes
-  [ ] F7  Seed card shows source, status, shelf life, age, topics, idea count
-  [ ] F8  Long press seed text selects and copies
-  [ ] F9  + My own idea saves a seed and it appears in the list
+  [x] F4  Status filters (all, new, posted, skipped) and topic chips both filter
+  [x] F5  Clear filters shows when a filter hides everything
+  [x] F6  Pull down refreshes
+  [x] F7  Seed card shows source, status, shelf life, age, topics, idea count
+  [x] F8  Long press seed text selects and copies
+  [x] F9  + My own idea saves a seed and it appears in the list  (now opens focused)
   [ ] F10 Offline: list still renders from cache, actions queue
 
 
 ## G. Seed thread
 
-  [ ] G1  Tap a seed opens its thread with the seed text at the top
-  [ ] G2  Generate with no instruction returns ideas
-  [ ] G3  Generate with an instruction follows it
-  [ ] G4  A second round appends, earlier rounds stay collapsed
-  [ ] G5  Per idea delete removes it, only the count goes to the backend
-  [ ] G6  Long press idea text selects and copies, tap copies
-  [ ] G7  Mark posted / skipped from the header menu
-  [ ] G8  Delete seed asks first, then returns to the list
-  [ ] G9  Composer: write, select, copy, paste
-  [ ] G10 Back returns to the list with the new idea count
+  [x] G1  Tap a seed opens its thread with the seed text at the top
+  [x] G2  Generate with no instruction returns ideas  (composer was missing entirely, fixed)
+  [x] G3  Generate with an instruction follows it
+  [x] G4  A second round appends, earlier rounds stay collapsed
+  [x] G5  Per idea delete removes it, only the count goes to the backend
+  [x] G6  Long press idea text selects and copies, tap copies
+  [x] G7  Mark posted / skipped from the header menu
+  [x] G8  Delete seed asks first, then returns to the list  (asked nothing from a thread, fixed)
+  [x] G9  Composer: write, select, copy, paste
+  [x] G10 Back returns to the list with the new idea count
 
 
 ## H. Cross cutting

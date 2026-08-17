@@ -53,7 +53,15 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.yash.feedrunner.ui.PostIdea
+import com.yash.feedrunner.ui.StoredSeed
 import com.yash.feedrunner.ui.SeedStatus
+import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.KeyboardActions
 
 /**
  * The Idea Bank.
@@ -122,20 +130,6 @@ fun IdeasScreen(state: IdeasUiState, actions: IdeasActions) {
         }
 
         BottomBar(onAddManual = { showManualDialog = true })
-    }
-
-    state.pendingDelete?.let { seed ->
-        AlertDialog(
-            onDismissRequest = actions.onCancelDelete,
-            title = { Text("Delete this seed?") },
-            text = { Text(seed.headline, style = MaterialTheme.typography.bodyMedium) },
-            confirmButton = {
-                TextButton(onClick = { actions.onConfirmDelete(seed) }) {
-                    Text("Delete", color = MaterialTheme.colorScheme.error)
-                }
-            },
-            dismissButton = { TextButton(onClick = actions.onCancelDelete) { Text("Cancel") } },
-        )
     }
 
     if (showManualDialog) {
@@ -383,6 +377,11 @@ private fun TextEntryDialog(
     onConfirm: (String) -> Unit,
 ) {
     var text by remember { mutableStateOf(initial) }
+    // The only thing to do in this dialog is type, so start there rather than
+    // making the first tap be on the field.
+    val field = remember { FocusRequester() }
+    LaunchedEffect(Unit) { runCatching { field.requestFocus() } }
+
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(title) },
@@ -392,7 +391,16 @@ private fun TextEntryDialog(
                     value = text,
                     onValueChange = { text = it },
                     placeholder = { Text(label) },
-                    modifier = Modifier.fillMaxWidth(),
+                    keyboardOptions = KeyboardOptions(
+                        capitalization = KeyboardCapitalization.Sentences,
+                        imeAction = ImeAction.Done,
+                    ),
+                    keyboardActions = KeyboardActions(
+                        onDone = { if (text.isNotBlank()) onConfirm(text) },
+                    ),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .focusRequester(field),
                 )
                 supporting?.let {
                     Text(
@@ -410,5 +418,31 @@ private fun TextEntryDialog(
             }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+    )
+}
+
+/**
+ * Asked before a seed is deleted, from the list or from inside its thread.
+ *
+ * Hosted by the activity rather than either screen: it used to live in the list,
+ * which is not composed while a thread is open, so "delete seed" in a thread put
+ * up no question and did nothing at all.
+ */
+@Composable
+internal fun ConfirmDeleteSeedDialog(
+    seed: StoredSeed,
+    onConfirm: () -> Unit,
+    onCancel: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onCancel,
+        title = { Text("Delete this seed?") },
+        text = { Text(seed.headline, style = MaterialTheme.typography.bodyMedium) },
+        confirmButton = {
+            TextButton(onClick = onConfirm) {
+                Text("Delete", color = MaterialTheme.colorScheme.error)
+            }
+        },
+        dismissButton = { TextButton(onClick = onCancel) { Text("Cancel") } },
     )
 }

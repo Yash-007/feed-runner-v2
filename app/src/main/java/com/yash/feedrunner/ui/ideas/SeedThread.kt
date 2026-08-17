@@ -103,9 +103,14 @@ internal fun SeedThreadScreen(
             )
         }
 
-        // The composer is deliberately left outside: a text field inside a
-        // selection container fights the field's own selection.
-        SelectionContainer(modifier = Modifier.weight(1f)) {
+        // The weight belongs to a plain Box. Given to the selection container
+        // directly, the list sized itself to its content and pushed the composer
+        // off the bottom of the screen, so there was no way to generate at all.
+        //
+        // The composer stays outside the container: a text field inside one fights
+        // the field's own selection.
+        Box(modifier = Modifier.weight(1f)) {
+            SelectionContainer {
             LazyColumn(
                 state = listState,
                 contentPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp),
@@ -149,6 +154,7 @@ internal fun SeedThreadScreen(
                 if (generating) {
                     item { GeneratingRow() }
                 }
+            }
             }
         }
 

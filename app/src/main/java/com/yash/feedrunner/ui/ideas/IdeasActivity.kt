@@ -84,8 +84,6 @@ data class IdeasActions(
     val onSetBaseUrl: (String) -> Unit,
     val onCopy: (String) -> Unit,
     val onAskDelete: (StoredSeed) -> Unit,
-    val onConfirmDelete: (StoredSeed) -> Unit,
-    val onCancelDelete: () -> Unit,
 )
 
 /**
@@ -113,6 +111,14 @@ class IdeasActivity : ComponentActivity() {
                 // under the navigation bar and the header under the status bar.
                 // safeDrawing covers the keyboard too, which is what a chat wants.
                 Surface(modifier = Modifier.safeDrawingPadding()) {
+                    state.pendingDelete?.let { seed ->
+                        ConfirmDeleteSeedDialog(
+                            seed = seed,
+                            onConfirm = { delete(seed) },
+                            onCancel = { state = state.copy(pendingDelete = null) },
+                        )
+                    }
+
                     val open = state.openSeed
                     if (open != null) {
                         SeedThreadScreen(
@@ -143,8 +149,6 @@ class IdeasActivity : ComponentActivity() {
                                 onSetBaseUrl = ::setBaseUrl,
                                 onCopy = ::copy,
                                 onAskDelete = { state = state.copy(pendingDelete = it) },
-                                onConfirmDelete = ::delete,
-                                onCancelDelete = { state = state.copy(pendingDelete = null) },
                             ),
                         )
                     }
