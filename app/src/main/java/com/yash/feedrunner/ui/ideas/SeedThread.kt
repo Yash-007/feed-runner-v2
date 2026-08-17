@@ -48,7 +48,6 @@ import androidx.compose.ui.unit.sp
 import com.yash.feedrunner.ui.ChatRole
 import com.yash.feedrunner.ui.SeedIdea
 import com.yash.feedrunner.ui.SeedStatus
-import com.yash.feedrunner.ui.SelectionActionsHost
 import com.yash.feedrunner.ui.StoredSeed
 
 /**
@@ -104,7 +103,9 @@ internal fun SeedThreadScreen(
             )
         }
 
-        SelectionActionsHost(modifier = Modifier.weight(1f)) {
+        // The composer is deliberately left outside: a text field inside a
+        // selection container fights the field's own selection.
+        SelectionContainer(modifier = Modifier.weight(1f)) {
             LazyColumn(
                 state = listState,
                 contentPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp),
@@ -270,19 +271,23 @@ private fun ThreadHeader(
                 }
             }
 
-            Text(
-                text = seed.headline,
-                style = MaterialTheme.typography.bodyMedium,
-                modifier = Modifier.padding(start = 12.dp, end = 8.dp, top = 2.dp),
-            )
-            if (seed.seed.angleHint.isNotBlank()) {
-                Text(
-                    text = seed.seed.angleHint,
-                    style = MaterialTheme.typography.bodySmall,
-                    fontStyle = FontStyle.Italic,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(start = 12.dp, end = 8.dp, top = 4.dp),
-                )
+            SelectionContainer {
+                Column {
+                    Text(
+                        text = seed.headline,
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.padding(start = 12.dp, end = 8.dp, top = 2.dp),
+                    )
+                    if (seed.seed.angleHint.isNotBlank()) {
+                        Text(
+                            text = seed.seed.angleHint,
+                            style = MaterialTheme.typography.bodySmall,
+                            fontStyle = FontStyle.Italic,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(start = 12.dp, end = 8.dp, top = 4.dp),
+                        )
+                    }
+                }
             }
             if (seed.lanes.isNotEmpty()) {
                 Row(
