@@ -1,3 +1,105 @@
-1. the writing, selecting, copying, etc experience of each message chat bar is very bad while writing anything (accross everywhere like replies, repost, post, seed idea creation, etc). we need to fix this and make as good as possible. pls open x and see how their ux while writing anything that is. we need to make exactly like that
-2. in the post section. also give me an option to add my own idea. so i an later work on that as well as other ideas.
-3. pls add one streak feature in the app where it will show the no. of replies i've done daily. so i'll motivate me in some way. make sure ui ux is modern, elegant and attractive. 
+# Feed Runner — sanity pass
+
+Every flow the app has, in the order you hit them. Mark as you go.
+  [ ] not checked   [x] works   [!] broken or feels bad, with a note
+
+Earlier asks, all shipped: chat bar writing/selecting/copying everywhere,
+"my own idea" in the post section, daily reply streak.
+
+
+## A. Setup screen (MainActivity)
+
+  [x] A1  Three readiness lines report the truth (overlay, capture service, API key)
+  [x] A2  Extra voice rules: type, Save, reopen app, text is still there
+  [x] A3  Extra voice rules: select / copy / paste inside the field
+  [x] A4  Start bubble puts the bubble on screen, survives leaving the app  (bubble now hides over our own screens)
+  [x] A5  Stop removes it, Start again brings it back  (one toggle button + running state line)
+  [x] A6  Ideas opens the Ideas screen and back returns here
+
+
+## B. Bubble and menu
+
+  [ ] B1  Bubble drags, sticks to the edge, does not swallow taps meant for X
+  [ ] B2  Tap opens the menu: Capture, Hold, Repost, Last result
+  [ ] B3  Menu shows how old the last result is and how many are saved
+  [x] B4  Tap outside the menu dismisses it without firing anything
+  [x] B5  Last result is absent or disabled when nothing is saved
+
+
+## C. Reply flow (Capture)
+
+  [ ] C1  Capture grabs the post under the bubble, not a stale screen
+  [ ] C2  Panel shows author, angle label, post text, capture thumbnail
+  [ ] C3  view opens the capture full size, closes back to the panel
+  [ ] C4  Drafts arrive within a few seconds, each with angle chip and one line gist
+  [ ] C5  Long press a draft: Copy / Select all, copy really copies
+  [ ] C6  Tap a draft copies the whole thing and marks it used
+  [ ] C7  Tap the used marker unmarks it, both here and in the backend
+  [ ] C8  refine on one card: shorter / funnier / specific / spicier replaces that card
+  [ ] C9  Sticky context bar appears once scrolled, "top" jumps back up
+  [ ] C10 Close, reopen from Last result: same drafts, used markers intact
+  [ ] C11 Hold (scroll and capture) stitches a long thread and reads it whole
+
+
+## D. Reply chat
+
+  [ ] D1  Type a message, send, reply appears and the thread scrolls to it
+  [ ] D2  Messages persist after closing and reopening the panel
+  [ ] D3  Long press any message, mine included: Copy / Select all
+  [ ] D4  Angle chips (funnier, add, extend, appreciate, push back) each return 4-5 drafts
+  [ ] D5  Quick prompts (another angle, hinglish, shorter one liner) work
+  [ ] D6  Jump to bottom button appears only when scrolled up
+  [ ] D7  Error state reads plainly and offers retry
+
+
+## E. Post and quote (Repost)
+
+  [ ] E1  Repost captures the current screen every time, never the previous one
+  [ ] E2  Post / Quote toggle explains what each does
+  [ ] E3  Held drafts banner offers the earlier set without a new API call
+  [ ] E4  "Your thought or an instruction" is optional, and a directive is obeyed
+  [ ] E5  Quick chips (make it funny, hinglish, one liner, tell the story) fill it
+  [ ] E6  Draft posts arrive with style chip and gist
+  [ ] E7  Long press a draft: Copy / Select all
+  [ ] E8  Tap copies and marks used, unmark works
+  [ ] E9  Chat below asks for a different quote and appends
+  [ ] E10 Capture preview is big enough to check before spending a call
+
+
+## F. Ideas screen
+
+  [ ] F1  Streak card: today's count, run, fourteen bars, best and all time
+  [ ] F2  Streak survives the backend being unreachable, and counts a fresh pick
+  [ ] F3  server dot reflects reachability, Set address dialog fixes a moved laptop
+  [ ] F4  Status filters (all, new, posted, skipped) and topic chips both filter
+  [ ] F5  Clear filters shows when a filter hides everything
+  [ ] F6  Pull down refreshes
+  [ ] F7  Seed card shows source, status, shelf life, age, topics, idea count
+  [ ] F8  Long press seed text selects and copies
+  [ ] F9  + My own idea saves a seed and it appears in the list
+  [ ] F10 Offline: list still renders from cache, actions queue
+
+
+## G. Seed thread
+
+  [ ] G1  Tap a seed opens its thread with the seed text at the top
+  [ ] G2  Generate with no instruction returns ideas
+  [ ] G3  Generate with an instruction follows it
+  [ ] G4  A second round appends, earlier rounds stay collapsed
+  [ ] G5  Per idea delete removes it, only the count goes to the backend
+  [ ] G6  Long press idea text selects and copies, tap copies
+  [ ] G7  Mark posted / skipped from the header menu
+  [ ] G8  Delete seed asks first, then returns to the list
+  [ ] G9  Composer: write, select, copy, paste
+  [ ] G10 Back returns to the list with the new idea count
+
+
+## H. Cross cutting
+
+  [ ] H1  Selection: bar appears everywhere, dismisses on tap away, nothing sticks
+  [ ] H2  Light and dark both readable, follows the system
+  [ ] H3  Nothing sits under the status bar or nav bar, no clipped controls
+  [ ] H4  API failure anywhere says what happened and lets you retry
+  [ ] H5  Backend down never blocks a reply or a post
+  [ ] H6  No draft or chat is ever lost by closing a panel
+  [ ] H7  Reopening the app lands where it should, nothing half drawn

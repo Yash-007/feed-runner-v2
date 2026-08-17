@@ -111,15 +111,36 @@ class MainActivity : ComponentActivity() {
                     Spacer(Modifier.height(4.dp))
 
                     if (hasOverlayPermission && captureServiceEnabled) {
+                        val bubbleRunning = BubbleService.running.value
+                        Text(
+                            text = if (bubbleRunning) {
+                                "Bubble is running · open X and tap it"
+                            } else {
+                                "Bubble is off"
+                            },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = if (bubbleRunning) {
+                                MaterialTheme.colorScheme.primary
+                            } else {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            },
+                        )
                         Row(
                             horizontalArrangement = Arrangement.spacedBy(10.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            Button(onClick = { BubbleService.start(this@MainActivity) }) {
-                                Text("Start bubble")
-                            }
-                            OutlinedButton(onClick = { BubbleService.stop(this@MainActivity) }) {
-                                Text("Stop")
+                            // One button that does the thing that is currently
+                            // possible, so the state is never in question.
+                            Button(
+                                onClick = {
+                                    if (bubbleRunning) {
+                                        BubbleService.stop(this@MainActivity)
+                                    } else {
+                                        BubbleService.start(this@MainActivity)
+                                    }
+                                },
+                            ) {
+                                Text(if (bubbleRunning) "Stop bubble" else "Start bubble")
                             }
                             OutlinedButton(
                                 onClick = {
@@ -142,6 +163,13 @@ class MainActivity : ComponentActivity() {
         super.onResume()
         hasOverlayPermission = Settings.canDrawOverlays(this)
         captureServiceEnabled = isCaptureServiceEnabled()
+        // The bubble is for other apps; it should not cover our own screens.
+        BubbleService.setOwnUiVisible(this, true)
+    }
+
+    override fun onPause() {
+        super.onPause()
+        BubbleService.setOwnUiVisible(this, false)
     }
 
     /**

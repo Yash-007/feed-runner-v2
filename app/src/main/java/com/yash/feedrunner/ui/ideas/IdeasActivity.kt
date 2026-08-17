@@ -14,6 +14,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.lifecycleScope
+import com.yash.feedrunner.bubble.BubbleService
 import com.yash.feedrunner.data.IdeaBankRepository
 import com.yash.feedrunner.ui.SeedStatus
 import com.yash.feedrunner.ui.StoredSeed
@@ -156,8 +157,14 @@ class IdeasActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
+        BubbleService.setOwnUiVisible(this, true)
         // Seeds are banked by the bubble service while this screen is closed.
         if (state.seeds.isNotEmpty()) refresh()
+    }
+
+    override fun onPause() {
+        super.onPause()
+        BubbleService.setOwnUiVisible(this, false)
     }
 
     private fun refresh() {

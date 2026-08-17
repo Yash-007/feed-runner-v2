@@ -21,6 +21,7 @@ import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.TextView
 import android.widget.Toast
+import androidx.compose.runtime.mutableStateOf
 import com.yash.feedrunner.capture.AutoScrollCapture
 import com.yash.feedrunner.capture.CaptureService
 import com.yash.feedrunner.data.ReadState
@@ -67,6 +68,15 @@ class BubbleService : Service() {
     /** Analyses currently in flight, shown on the bubble. */
     private var pendingAnalyses = 0
 
+    // Four unrelated things want the bubble out of the way, and they overlap: a
+    // panel can open over held repost drafts, a capture can start from either.
+    // Each sets its own flag and one function decides, so closing one thing can
+    // never bring the bubble back while another still needs it gone.
+    private var panelUp = false
+    private var composerUp = false
+    private var capturing = false
+    private var ownUiUp = false
+
     private lateinit var resultStore: ResultStore
     private lateinit var readState: ReadState
     private lateinit var analysisManager: AnalysisManager
@@ -78,6 +88,8 @@ class BubbleService : Service() {
 
     override fun onCreate() {
         super.onCreate()
+        running.value = true
+        ownUiUp = ownScreens > 0
         windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
         resultStore = ResultStore(this)
         readState = ReadState(this)
@@ -89,7 +101,8 @@ class BubbleService : Service() {
             analysisManager,
         ) { panelVisible ->
             // Hide the bubble while the panel is up so it doesn't sit on the scrim.
-            bubbleView?.visibility = if (panelVisible) View.GONE else View.VISIBLE
+            panelUp = panelVisible
+            applyBubbleVisibility()
             if (!panelVisible) refreshUnreadBadge()
         }
 
@@ -99,7 +112,8 @@ class BubbleService : Service() {
         }
         analysisManager.onUpdate = ::onAnalysisUpdate
         repostController = RepostController(this, windowManager) { visible ->
-            bubbleView?.visibility = if (visible) View.GONE else View.VISIBLE
+            composerUp = visible
+            applyBubbleVisibility()
         }
         menuController = MenuController(
             context = this,
@@ -115,14 +129,35 @@ class BubbleService : Service() {
         )
         startForeground(NOTIFICATION_ID, buildNotification())
         addBubble()
+        // The view is created visible, so apply the state the flags already hold:
+        // started from our own screen, the bubble should not appear on top of it.
+        applyBubbleVisibility()
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        if (intent?.action == ACTION_STOP) {
-            stopSelf()
-            return START_NOT_STICKY
+        when (intent?.action) {
+            ACTION_STOP -> {
+                stopSelf()
+                return START_NOT_STICKY
+            }
+            ACTION_OWN_UI -> {
+                ownUiUp = intent.getBooleanExtra(EXTRA_VISIBLE, false)
+                applyBubbleVisibility()
+            }
         }
         return START_STICKY
+    }
+
+    /**
+     * INVISIBLE rather than GONE during a capture: the window keeps its place so
+     * the screenshot is taken with the same layout the user was looking at.
+     */
+    private fun applyBubbleVisibility() {
+        bubbleView?.visibility = when {
+            capturing -> View.INVISIBLE
+            panelUp || composerUp || ownUiUp -> View.GONE
+            else -> View.VISIBLE
+        }
     }
 
     /**
@@ -154,6 +189,7 @@ class BubbleService : Service() {
     }
 
     override fun onDestroy() {
+        running.value = false
         autoCapture?.stop()
         analysisManager.shutdown()
         menuController.dismiss()
@@ -308,10 +344,14 @@ class BubbleService : Service() {
             statusBarPx = statusBarHeightPx(),
             screenHeightPx = resources.displayMetrics.heightPixels,
             hideBubble = { onHidden ->
-                bubbleView?.visibility = View.INVISIBLE
+                capturing = true
+                applyBubbleVisibility()
                 bubbleView?.postDelayed(onHidden, 150) ?: onHidden()
             },
-            showBubble = { bubbleView?.visibility = View.VISIBLE },
+            showBubble = {
+                capturing = false
+                applyBubbleVisibility()
+            },
             onProgress = { frames ->
                 holdFrames = frames
                 refreshBubbleBadge()
@@ -505,6 +545,8 @@ class BubbleService : Service() {
 
     companion object {
         const val ACTION_STOP = "com.yash.feedrunner.STOP_BUBBLE"
+        private const val ACTION_OWN_UI = "com.yash.feedrunner.OWN_UI"
+        private const val EXTRA_VISIBLE = "visible"
         private const val CHANNEL_ID = "bubble"
         private const val NOTIFICATION_ID = 1
 
@@ -519,6 +561,36 @@ class BubbleService : Service() {
         fun stop(context: Context) {
             context.startService(
                 Intent(context, BubbleService::class.java).setAction(ACTION_STOP),
+            )
+        }
+
+        /**
+         * Whether the bubble is up. Compose state rather than a plain flag so the
+         * setup screen can say so without polling.
+         */
+        val running = mutableStateOf(false)
+
+        /**
+         * How many of our own screens are on top. Counted rather than a flag so
+         * moving between the setup screen and Ideas, where the next screen resumes
+         * before the last one pauses, does not flash the bubble in between.
+         *
+         * Lives in the same process as the service, so if the process is restarted
+         * both this and the service start from nothing and the bubble is visible.
+         */
+        private var ownScreens = 0
+
+        /** Called by our own screens as they come and go. The bubble is for other apps. */
+        fun setOwnUiVisible(context: Context, visible: Boolean) {
+            ownScreens = (ownScreens + if (visible) 1 else -1).coerceAtLeast(0)
+            // Nothing to tell when the bubble is off. It reads the count itself when
+            // it starts, so starting it from our own screen does not put it on top
+            // of that screen.
+            if (!running.value) return
+            context.startService(
+                Intent(context, BubbleService::class.java)
+                    .setAction(ACTION_OWN_UI)
+                    .putExtra(EXTRA_VISIBLE, ownScreens > 0),
             )
         }
     }
