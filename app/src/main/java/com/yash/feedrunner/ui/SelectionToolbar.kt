@@ -2,11 +2,13 @@ package com.yash.feedrunner.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -20,6 +22,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.layout.boundsInWindow
@@ -116,6 +120,19 @@ internal fun SelectionActionsHost(
     // Where the bar ended up, so a tap on it is not mistaken for a tap away.
     val barBounds = remember { mutableStateOf(Rect.Zero) }
 
+    // A SelectionContainer drops its selection when it loses focus, and nothing else
+    // makes it let go. Tapping blank space is not a focus target, so a selection used
+    // to stay highlighted with its handles up long after the bar was gone. Focusing
+    // this instead takes focus off the selection and the highlight goes with it.
+    val focusSink = remember { FocusRequester() }
+    val dismiss: () -> Unit = {
+        val wasReadOnly = request.value?.editable == false
+        request.value = null
+        // Only for read-only text: taking focus off a field would close the keyboard
+        // mid sentence.
+        if (wasReadOnly) runCatching { focusSink.requestFocus() }
+    }
+
     // For read-only text, hide() is ignored. Compose hides the toolbar whenever the
     // selection moves on screen, and starting a selection scrolls it into view, so
     // every long press ended on a hide while the selection was still sitting there
@@ -143,12 +160,21 @@ internal fun SelectionActionsHost(
                             val event = awaitPointerEvent(PointerEventPass.Initial)
                             if (event.type != PointerEventType.Press) continue
                             val point = event.changes.first().position + hostOrigin.value
-                            if (!barBounds.value.contains(point)) request.value = null
+                            if (request.value != null && !barBounds.value.contains(point)) {
+                                dismiss()
+                            }
                         }
                     }
                 },
         ) {
             content()
+            // Somewhere for focus to land, sized so it never shows or shifts anything.
+            Box(
+                modifier = Modifier
+                    .size(1.dp)
+                    .focusRequester(focusSink)
+                    .focusable(),
+            )
             // matchParentSize takes the host's size instead of contributing to it.
             // As a plain child the bar grew the host when it appeared, which
             // relaid out the text underneath, and the selection machinery answers a
@@ -159,7 +185,7 @@ internal fun SelectionActionsHost(
                     request = request,
                     hostOrigin = hostOrigin,
                     onBounds = { barBounds.value = it },
-                    onDone = { request.value = null },
+                    onDone = dismiss,
                 )
             }
         }
