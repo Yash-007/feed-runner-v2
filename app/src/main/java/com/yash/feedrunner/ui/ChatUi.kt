@@ -133,7 +133,6 @@ internal fun ChatHistory(
 internal fun ChatComposer(
     pending: Boolean,
     quickPrompts: List<String>,
-    showQuickPrompts: Boolean,
     onSend: (String) -> Unit,
     onFocusChanged: (Boolean) -> Unit,
     /** Angles offered as one-tap batches. Empty hides the row. */
@@ -150,7 +149,10 @@ internal fun ChatComposer(
             AngleChips(angles = angles, enabled = !pending, onPick = onAngleBatch)
         }
 
-        if (showQuickPrompts && !pending) {
+        // Offered whenever the field is empty rather than only on the first turn.
+        // They used to vanish for good once anything had been sent, which is exactly
+        // when you have seen a few replies and want a different cut of them.
+        if (quickPrompts.isNotEmpty() && input.isBlank() && !pending) {
             QuickPrompts(prompts = quickPrompts, onPick = onSend)
         }
 
@@ -449,8 +451,15 @@ internal fun JumpToBottom(visible: Boolean, onClick: () -> Unit, modifier: Modif
     }
 }
 
-/** Ignore a few stray pixels so the button doesn't flicker at the very bottom. */
-internal const val JUMP_VISIBLE_SLOP = 24
+/**
+ * How close to the bottom counts as "already there".
+ *
+ * Roughly the height of the composer block, because the composer scrolls with the
+ * content into the same corner the button sits in: at a few pixels of slop the
+ * button ended up sitting directly on top of the send button. By the time the
+ * composer is on screen the newest content is too, so there is nothing to jump to.
+ */
+internal const val JUMP_VISIBLE_SLOP = 220
 
 /** Shared so every copy confirmation in the app clears at the same pace. */
 internal const val COPIED_HINT_MS = 1400L

@@ -40,6 +40,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.surfaceColorAtElevation
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -313,7 +314,6 @@ private fun ReadyBody(
             ChatComposer(
                 pending = state.chatPending,
                 quickPrompts = REPLY_QUICK_PROMPTS,
-                showQuickPrompts = state.chat.isEmpty(),
                 onSend = onSendChat,
                 onFocusChanged = onChatFocusChanged,
                 angles = BATCH_ANGLES,
@@ -343,6 +343,15 @@ private fun ReadyBody(
  */
 @Composable
 private fun StickyContextBar(context: PostContext, onTap: () -> Unit) {
+    // An opaque band behind the pill, matching the sheet. Without it the drafts
+    // scrolled visibly through the gap around the pill's rounded corners, which
+    // read as a rendering fault rather than a header.
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.surfaceColorAtElevation(8.dp))
+            .padding(bottom = 6.dp),
+    ) {
     Surface(
         color = MaterialTheme.colorScheme.surface,
         tonalElevation = 6.dp,
@@ -377,6 +386,7 @@ private fun StickyContextBar(context: PostContext, onTap: () -> Unit) {
                 color = MaterialTheme.colorScheme.primary,
             )
         }
+    }
     }
 }
 

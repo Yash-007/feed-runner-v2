@@ -217,7 +217,6 @@ fun RepostPanel(
                             ChatComposer(
                                 pending = state.chatPending,
                                 quickPrompts = POST_QUICK_PROMPTS,
-                                showQuickPrompts = state.result.chat.isEmpty(),
                                 onSend = onSendChat,
                                 onFocusChanged = trackFocus,
                             )

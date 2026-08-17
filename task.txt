@@ -28,27 +28,27 @@ Earlier asks, all shipped: chat bar writing/selecting/copying everywhere,
 
 ## C. Reply flow (Capture)
 
-  [ ] C1  Capture grabs the post under the bubble, not a stale screen
-  [ ] C2  Panel shows author, angle label, post text, capture thumbnail
-  [ ] C3  view opens the capture full size, closes back to the panel
-  [ ] C4  Drafts arrive within a few seconds, each with angle chip and one line gist
-  [ ] C5  Long press a draft: Copy / Select all, copy really copies
-  [ ] C6  Tap a draft copies the whole thing and marks it used
-  [ ] C7  Tap the used marker unmarks it, both here and in the backend
-  [ ] C8  refine on one card: shorter / funnier / specific / spicier replaces that card
-  [ ] C9  Sticky context bar appears once scrolled, "top" jumps back up
-  [ ] C10 Close, reopen from Last result: same drafts, used markers intact
+  [x] C1  Capture grabs the post under the bubble, not a stale screen
+  [x] C2  Panel shows author, angle label, post text, capture thumbnail
+  [x] C3  view opens the capture full size, closes back to the panel
+  [x] C4  Drafts arrive within a few seconds, each with angle chip and one line gist
+  [x] C5  Long press a draft: Copy / Select all, copy really copies
+  [x] C6  Tap a draft copies the whole thing and marks it used
+  [x] C7  Tap the used marker unmarks it, both here and in the backend
+  [x] C8  refine on one card: shorter / funnier / specific / spicier replaces that card
+  [x] C9  Sticky context bar appears once scrolled, "top" jumps back up  (text bled through it, fixed)
+  [x] C10 Close, reopen from Last result: same drafts, used markers intact
   [ ] C11 Hold (scroll and capture) stitches a long thread and reads it whole
 
 
 ## D. Reply chat
 
-  [ ] D1  Type a message, send, reply appears and the thread scrolls to it
-  [ ] D2  Messages persist after closing and reopening the panel
-  [ ] D3  Long press any message, mine included: Copy / Select all
-  [ ] D4  Angle chips (funnier, add, extend, appreciate, push back) each return 4-5 drafts
-  [ ] D5  Quick prompts (another angle, hinglish, shorter one liner) work
-  [ ] D6  Jump to bottom button appears only when scrolled up
+  [x] D1  Type a message, send, reply appears and the thread scrolls to it
+  [x] D2  Messages persist after closing and reopening the panel
+  [x] D3  Long press any message, mine included: Copy / Select all
+  [x] D4  Angle chips (funnier, add, extend, appreciate, push back) each return 4-5 drafts
+  [x] D5  Quick prompts (another angle, hinglish, shorter one liner) work  (were hidden for good after the first send, fixed)
+  [x] D6  Jump to bottom button appears only when scrolled up  (overlapped the send button, fixed)
   [ ] D7  Error state reads plainly and offers retry
 
 
