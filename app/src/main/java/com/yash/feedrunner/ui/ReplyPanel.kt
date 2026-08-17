@@ -265,6 +265,13 @@ private fun ReadyBody(
                     onSelect = onSelectResult,
                 )
             }
+
+            // Everything above the chat in one container: the post you are replying
+            // to and the drafts themselves are text you may want part of, not just
+            // all of. The chat below keeps its own container, since containers
+            // cannot nest.
+            SelectionContainer {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             PostContextBlock(
                 context = state.postContext,
                 thumbnailPath = state.thumbnailPath,
@@ -287,19 +294,27 @@ private fun ReadyBody(
             }
 
             Text(
-                text = "Tap a draft to copy it. The panel stays open.",
+                text = "Tap a draft to copy it, long press to select part of it.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            ChatThread(
-                chat = state.chat,
+
+                    ChatHistory(
+                        chat = state.chat,
+                        pending = state.chatPending,
+                        title = "More replies, or ask for anything",
+                        error = state.chatError,
+                        onCopyText = onCopyText,
+                        onRetry = onRetryChat,
+                    )
+                }
+            }
+
+            ChatComposer(
                 pending = state.chatPending,
                 quickPrompts = REPLY_QUICK_PROMPTS,
-                title = "More replies, or ask for anything",
-                error = state.chatError,
-                onCopyText = onCopyText,
+                showQuickPrompts = state.chat.isEmpty(),
                 onSend = onSendChat,
-                onRetry = onRetryChat,
                 onFocusChanged = onChatFocusChanged,
                 angles = BATCH_ANGLES,
                 onAngleBatch = onAngleBatch,

@@ -57,22 +57,23 @@ import kotlinx.coroutines.delay
  * Both need the same interaction model: single tap on an answer copies it, a
  * longer press hands it to a selection container for partial copying.
  */
+/**
+ * The conversation history: bubbles, the typing indicator and any failure.
+ *
+ * Deliberately does not wrap itself in a SelectionContainer. Two containers under
+ * one text toolbar fight each other, because starting a selection in one makes the
+ * other clear itself and hide the shared toolbar. Each panel therefore owns a single
+ * container covering all of its read-only text, and this composable sits inside it.
+ */
 @Composable
-internal fun ChatThread(
+internal fun ChatHistory(
     chat: List<ChatMessage>,
     pending: Boolean,
-    quickPrompts: List<String>,
     title: String,
     error: String?,
     onCopyText: (String) -> Unit,
-    onSend: (String) -> Unit,
     onRetry: () -> Unit,
-    onFocusChanged: (Boolean) -> Unit,
-    /** Angles offered as one-tap batches. Empty hides the row. */
-    angles: List<Angle> = emptyList(),
-    onAngleBatch: (Angle) -> Unit = {},
 ) {
-    var input by remember { mutableStateOf("") }
     var copiedIndex by remember { mutableIntStateOf(-1) }
 
     // The "copied" marker is transient; clear it without the caller having to.
@@ -83,7 +84,7 @@ internal fun ChatThread(
         }
     }
 
-    Column(modifier = Modifier.padding(top = 6.dp, bottom = 4.dp)) {
+    Column(modifier = Modifier.padding(top = 6.dp)) {
         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
 
         Row(
@@ -105,6 +106,43 @@ internal fun ChatThread(
             }
         }
 
+        chat.forEachIndexed { index, message ->
+            ChatBubble(
+                message = message,
+                copied = copiedIndex == index,
+                onCopy = {
+                    onCopyText(message.text)
+                    copiedIndex = index
+                },
+            )
+        }
+
+        if (pending) TypingIndicator()
+
+        error?.let { ChatError(message = it, onRetry = onRetry) }
+    }
+}
+
+/**
+ * Where you type, plus the one-tap steers.
+ *
+ * Kept out of the selection container above: a text field inside one fights the
+ * field's own selection handles.
+ */
+@Composable
+internal fun ChatComposer(
+    pending: Boolean,
+    quickPrompts: List<String>,
+    showQuickPrompts: Boolean,
+    onSend: (String) -> Unit,
+    onFocusChanged: (Boolean) -> Unit,
+    /** Angles offered as one-tap batches. Empty hides the row. */
+    angles: List<Angle> = emptyList(),
+    onAngleBatch: (Angle) -> Unit = {},
+) {
+    var input by remember { mutableStateOf("") }
+
+    Column(modifier = Modifier.padding(bottom = 4.dp)) {
         // Angle chips stay put rather than disappearing once the chat starts: they
         // are the fastest way to ask for a different kind of reply, and wanting one
         // is not limited to the first turn.
@@ -112,33 +150,9 @@ internal fun ChatThread(
             AngleChips(angles = angles, enabled = !pending, onPick = onAngleBatch)
         }
 
-        if (chat.isEmpty() && !pending) {
+        if (showQuickPrompts && !pending) {
             QuickPrompts(prompts = quickPrompts, onPick = onSend)
         }
-
-        // One container around the whole conversation, so a long press starts a
-        // normal Android selection with handles and the Copy / Select all toolbar,
-        // and a selection can run across messages. The previous per-bubble version
-        // needed one long press to arm selection and a second to begin it, which is
-        // what made selecting text feel broken.
-        SelectionContainer {
-            Column {
-                chat.forEachIndexed { index, message ->
-                    ChatBubble(
-                        message = message,
-                        copied = copiedIndex == index,
-                        onCopy = {
-                            onCopyText(message.text)
-                            copiedIndex = index
-                        },
-                    )
-                }
-            }
-        }
-
-        if (pending) TypingIndicator()
-
-        error?.let { ChatError(message = it, onRetry = onRetry) }
 
         ChatInput(
             value = input,

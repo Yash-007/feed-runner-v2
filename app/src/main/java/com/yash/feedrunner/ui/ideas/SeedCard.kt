@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
@@ -35,7 +36,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.yash.feedrunner.ui.ChatThread
 import com.yash.feedrunner.ui.SEED_QUICK_PROMPTS
 import com.yash.feedrunner.ui.SeedStatus
 import com.yash.feedrunner.ui.StoredSeed
@@ -73,23 +73,29 @@ internal fun SeedCard(seed: StoredSeed, onOpen: () -> Unit) {
                 )
             }
 
-            Text(
-                text = seed.headline,
-                style = MaterialTheme.typography.bodyLarge,
-                maxLines = 3,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.padding(top = 8.dp),
-            )
+            // Selectable in the list too: a tension is often the thing you want to
+            // lift out, and the card tap still opens the thread.
+            SelectionContainer {
+                Column {
+                    Text(
+                        text = seed.headline,
+                        style = MaterialTheme.typography.bodyLarge,
+                        maxLines = 3,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(top = 8.dp),
+                    )
 
-            if (seed.seed.themeTags.isNotEmpty()) {
-                Text(
-                    text = seed.seed.themeTags.joinToString(" · "),
-                    fontSize = 11.sp,
-                    color = MaterialTheme.colorScheme.primary,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.padding(top = 6.dp),
-                )
+                    if (seed.seed.themeTags.isNotEmpty()) {
+                        Text(
+                            text = seed.seed.themeTags.joinToString(" · "),
+                            fontSize = 11.sp,
+                            color = MaterialTheme.colorScheme.primary,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.padding(top = 6.dp),
+                        )
+                    }
+                }
             }
 
             // The one number worth surfacing in the list: whether this seed has

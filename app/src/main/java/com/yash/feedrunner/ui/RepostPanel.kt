@@ -203,19 +203,22 @@ fun RepostPanel(
                         )
                         is RepostState.Ready -> {
                             Results(
-                            result = state.result,
-                            onCopyDraft = onCopyDraft,
-                            onToggleUsed = onToggleUsed,
-                        )
-                            ChatThread(
+                                result = state.result,
+                                onCopyDraft = onCopyDraft,
+                                onToggleUsed = onToggleUsed,
                                 chat = state.result.chat,
+                                chatPending = state.chatPending,
+                                chatError = state.chatError,
+                                chatTitle = "Ask for a different " +
+                                    state.result.mode.label.lowercase(),
+                                onCopyText = onCopyText,
+                                onRetryChat = onRetryChat,
+                            )
+                            ChatComposer(
                                 pending = state.chatPending,
                                 quickPrompts = POST_QUICK_PROMPTS,
-                                title = "Ask for a different ${state.result.mode.label.lowercase()}",
-                                error = state.chatError,
-                                onCopyText = onCopyText,
+                                showQuickPrompts = state.result.chat.isEmpty(),
                                 onSend = onSendChat,
-                                onRetry = onRetryChat,
                                 onFocusChanged = trackFocus,
                             )
                         }
@@ -614,6 +617,12 @@ private fun Results(
     result: RepostResult,
     onCopyDraft: (PostDraft) -> Unit,
     onToggleUsed: (PostDraft) -> Unit,
+    chat: List<ChatMessage>,
+    chatPending: Boolean,
+    chatError: String?,
+    chatTitle: String,
+    onCopyText: (String) -> Unit,
+    onRetryChat: () -> Unit,
 ) {
     var selectingId by remember { mutableIntStateOf(-1) }
     var copiedId by remember { mutableIntStateOf(-1) }
@@ -628,38 +637,53 @@ private fun Results(
     Column(modifier = Modifier.padding(top = 16.dp)) {
         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
 
-        CaptureSummary(result)
+        // The capture summary and the drafts in one container: long press selects
+        // straight away, the way it does in the chat, rather than needing a first
+        // press just to arm selection.
+        SelectionContainer {
+            Column {
+                CaptureSummary(result)
 
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.padding(top = 10.dp, bottom = 4.dp),
-        ) {
-            Text(
-                text = "Drafts",
-                style = MaterialTheme.typography.labelLarge,
-                fontWeight = FontWeight.SemiBold,
-                modifier = Modifier.weight(1f),
-            )
-            Text(
-                text = "tap to copy · hold to select",
-                fontSize = 9.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.padding(top = 10.dp, bottom = 4.dp),
+                ) {
+                    Text(
+                        text = "Drafts",
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.weight(1f),
+                    )
+                    Text(
+                        text = "tap to copy · long press to select",
+                        fontSize = 9.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
 
-        result.drafts.forEach { draft ->
-            PostDraftCard(
-                draft = draft,
-                selecting = selectingId == draft.id,
-                copied = copiedId == draft.id,
-                onCopy = {
-                    onCopyDraft(draft)
-                    copiedId = draft.id
-                    selectingId = -1
-                },
-                onToggleUsed = { onToggleUsed(draft) },
-                onLongPress = { selectingId = draft.id },
-            )
+                result.drafts.forEach { draft ->
+                    PostDraftCard(
+                        draft = draft,
+                        copied = copiedId == draft.id,
+                        onCopy = {
+                            onCopyDraft(draft)
+                            copiedId = draft.id
+                        },
+                        onToggleUsed = { onToggleUsed(draft) },
+                    )
+                }
+
+                // Inside the same container as the drafts: one selection scope for
+                // all the read-only text in this sheet.
+                ChatHistory(
+                    chat = chat,
+                    pending = chatPending,
+                    title = chatTitle,
+                    error = chatError,
+                    onCopyText = onCopyText,
+                    onRetry = onRetryChat,
+                )
+            }
         }
     }
 }
@@ -718,27 +742,16 @@ private fun CaptureSummary(result: RepostResult) {
 @Composable
 private fun PostDraftCard(
     draft: PostDraft,
-    selecting: Boolean,
     copied: Boolean,
     onCopy: () -> Unit,
     onToggleUsed: () -> Unit,
-    onLongPress: () -> Unit,
 ) {
     val haptics = LocalHapticFeedback.current
 
     Column(modifier = Modifier.padding(vertical = 5.dp)) {
         Surface(
             shape = RoundedCornerShape(14.dp),
-            color = if (selecting) {
-                MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)
-            } else {
-                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-            },
-            border = if (selecting) {
-                BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.5f))
-            } else {
-                null
-            },
+            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
             modifier = Modifier.fillMaxWidth(),
         ) {
             val body = @Composable {
@@ -779,19 +792,12 @@ private fun PostDraftCard(
                 }
             }
 
-            if (selecting) {
-                SelectionContainer { body() }
-            } else {
-                Box(
-                    modifier = Modifier.combinedClickable(
-                        onClick = onCopy,
-                        onLongClick = {
-                            haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                            onLongPress()
-                        },
-                    ),
-                ) { body() }
-            }
+            Box(
+                modifier = Modifier.clickable {
+                    haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                    onCopy()
+                },
+            ) { body() }
         }
 
         AnimatedVisibility(
