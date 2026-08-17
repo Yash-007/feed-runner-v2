@@ -153,11 +153,13 @@ class BubbleService : Service() {
      * the screenshot is taken with the same layout the user was looking at.
      */
     private fun applyBubbleVisibility() {
-        bubbleView?.visibility = when {
+        val view = bubbleView ?: return
+        val wanted = when {
             capturing -> View.INVISIBLE
             panelUp || composerUp || ownUiUp -> View.GONE
             else -> View.VISIBLE
         }
+        view.visibility = wanted
     }
 
     /**

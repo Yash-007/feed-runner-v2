@@ -19,9 +19,9 @@ Earlier asks, all shipped: chat bar writing/selecting/copying everywhere,
 
 ## B. Bubble and menu
 
-  [ ] B1  Bubble drags, sticks to the edge, does not swallow taps meant for X
-  [ ] B2  Tap opens the menu: Capture, Hold, Repost, Last result
-  [ ] B3  Menu shows how old the last result is and how many are saved
+  [x] B1  Bubble drags, sticks to the edge, does not swallow taps meant for X
+  [x] B2  Tap opens the menu: Capture, Hold, Repost, Last result
+  [x] B3  Menu shows how old the last result is and how many are saved
   [x] B4  Tap outside the menu dismisses it without firing anything
   [x] B5  Last result is absent or disabled when nothing is saved
 
