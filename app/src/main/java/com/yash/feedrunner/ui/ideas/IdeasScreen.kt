@@ -75,12 +75,10 @@ fun IdeasScreen(state: IdeasUiState, actions: IdeasActions) {
             onEditAddress = { showAddressDialog = true },
         )
 
-        state.streak?.let { streak ->
-            StreakCard(
-                streak = streak,
-                modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
-            )
-        }
+        StreakCard(
+            streak = state.streak,
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+        )
 
         FilterBar(
             status = state.filter,

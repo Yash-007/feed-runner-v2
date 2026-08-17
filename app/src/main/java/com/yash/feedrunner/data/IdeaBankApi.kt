@@ -20,8 +20,16 @@ import java.text.SimpleDateFormat
 import java.util.Locale
 import java.util.TimeZone
 
-/** A backend request that failed, with a message fit to show on screen. */
-class IdeaBankException(message: String) : Exception(message)
+/**
+ * A backend request that failed, with a message fit to show on screen.
+ *
+ * [reachable] separates "the server said no" from "nothing answered", which decides
+ * whether trying another address could help.
+ */
+class IdeaBankException(
+    message: String,
+    val reachable: Boolean = false,
+) : Exception(message)
 
 /**
  * Thin HTTP client for the Idea Bank backend.
@@ -165,9 +173,52 @@ class IdeaBankApi(private val config: BackendConfig) {
 
     // --- transport ---------------------------------------------------------
 
+    /**
+     * Tries the configured address, then the USB tunnel.
+     *
+     * The backend lives on a laptop whose LAN address changes with the network, and
+     * the two are not always on the same subnet. Falling back to the loopback
+     * address means `adb reverse tcp:8080 tcp:8080` keeps everything working over
+     * the cable without editing the address by hand.
+     */
     private fun request(method: String, path: String, payload: JSONObject?): JSONObject {
         val base = config.baseUrl
         if (base.isEmpty()) throw IdeaBankException("Set the backend address first")
+
+        // Whichever answered last goes first; the other is the fallback.
+        val candidates = buildList {
+            val preferred = config.lastWorking.takeIf { it.isNotEmpty() }
+            if (preferred != null) add(preferred)
+            add(base)
+            add(USB_TUNNEL)
+        }.distinct()
+
+        var failure: IdeaBankException? = null
+        for (candidate in candidates) {
+            val outcome = runCatching { requestAt(candidate, method, path, payload) }
+            outcome.getOrNull()?.let { body ->
+                if (config.lastWorking != candidate) config.lastWorking = candidate
+                return body
+            }
+            val error = outcome.exceptionOrNull()
+            if (error is IdeaBankException) {
+                // A server that answered with an error is reachable, so stop here
+                // rather than retrying the same request against another address.
+                if (error.reachable) throw error
+                failure = error
+            } else if (error != null) {
+                throw error
+            }
+        }
+        throw failure ?: IdeaBankException("Cannot reach the backend. Is it running?")
+    }
+
+    private fun requestAt(
+        base: String,
+        method: String,
+        path: String,
+        payload: JSONObject?,
+    ): JSONObject {
 
         val connection = try {
             URL(base + path).openConnection() as HttpURLConnection
@@ -196,7 +247,7 @@ class IdeaBankApi(private val config: BackendConfig) {
             if (code !in 200..299) {
                 val message = body.optString("error").takeIf { it.isNotBlank() }
                     ?: "Server returned $code"
-                throw IdeaBankException(message)
+                throw IdeaBankException(message, reachable = true)
             }
             body
         } catch (error: IOException) {
@@ -209,6 +260,9 @@ class IdeaBankApi(private val config: BackendConfig) {
 
     private companion object {
         const val TAG = "IdeaBankApi"
+
+        /** Reachable whenever `adb reverse tcp:8080 tcp:8080` is set up. */
+        const val USB_TUNNEL = "http://127.0.0.1:8080"
         const val CONNECT_TIMEOUT_MS = 4000
         const val READ_TIMEOUT_MS = 120_000
     }

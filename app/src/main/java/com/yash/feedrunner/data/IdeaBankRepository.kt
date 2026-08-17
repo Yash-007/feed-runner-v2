@@ -22,6 +22,7 @@ class IdeaBankRepository(context: Context) {
 
     private val outbox = SeedOutbox(context)
     private val pickOutbox = PickOutbox(context)
+    private val streakStore = StreakStore(context)
     private val config = BackendConfig(context)
     private val api = IdeaBankApi(config)
 
@@ -66,7 +67,20 @@ class IdeaBankRepository(context: Context) {
         flushAsync()
     }
 
-    fun loadStreak(): Result<Streak> = runCatching { api.streak() }
+    /**
+     * Never fails: a habit tracker that vanishes when the laptop changes network is
+     * worse than a slightly stale one. The server is used when it answers and cached
+     * for when it does not.
+     */
+    fun streak(): Streak {
+        runCatching { api.streak() }
+            .onSuccess { streakStore.cache(it) }
+            .onFailure { Log.w(TAG, "streak fetch failed, showing the cached one", it) }
+        return streakStore.current()
+    }
+
+    /** What to show before any network call, so the card is there on first frame. */
+    fun cachedStreak(): Streak = streakStore.current()
 
     /**
      * Queues a hand-typed idea and returns its client id, so the caller can open
@@ -101,6 +115,9 @@ class IdeaBankRepository(context: Context) {
      */
     fun recordPick(pick: DraftPick) {
         pickOutbox.put(pick)
+        // Counted now so the streak moves the moment a reply is copied, with or
+        // without a reachable backend.
+        if (pick.source == "reply") streakStore.recordReply()
         Log.i(TAG, "picked ${pick.clientPickId} (${pick.variant})")
         flushAsync()
     }
@@ -108,6 +125,7 @@ class IdeaBankRepository(context: Context) {
     /** Mirrors unmarking "used": the pick is removed rather than annotated. */
     fun removePick(clientPickId: String) {
         pickOutbox.delete(clientPickId)
+        if (clientPickId.startsWith("reply-")) streakStore.removeReply()
         Log.i(TAG, "unpicked $clientPickId")
         flushAsync()
     }

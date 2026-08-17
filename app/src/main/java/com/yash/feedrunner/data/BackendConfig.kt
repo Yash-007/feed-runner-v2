@@ -22,6 +22,19 @@ class BackendConfig(context: Context) {
 
     val isConfigured: Boolean get() = baseUrl.isNotEmpty()
 
+    /**
+     * The address that answered last, tried first next time.
+     *
+     * Without this, every request pays the full connect timeout against a stale LAN
+     * address before falling back to the USB tunnel, which made the whole app feel
+     * broken rather than merely offline.
+     */
+    var lastWorking: String
+        get() = prefs.getString(KEY_LAST_WORKING, "").orEmpty()
+        set(value) {
+            prefs.edit().putString(KEY_LAST_WORKING, value).apply()
+        }
+
     private fun normalise(raw: String): String {
         val trimmed = raw.trim().trimEnd('/')
         if (trimmed.isEmpty()) return ""
@@ -35,5 +48,6 @@ class BackendConfig(context: Context) {
 
     private companion object {
         const val KEY_BASE_URL = "base_url"
+        const val KEY_LAST_WORKING = "last_working"
     }
 }

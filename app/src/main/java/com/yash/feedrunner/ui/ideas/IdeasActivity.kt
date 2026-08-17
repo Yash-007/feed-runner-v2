@@ -47,8 +47,8 @@ data class IdeasUiState(
     /** Null until the first load answers either way. */
     val serverReachable: Boolean? = null,
     val pendingDelete: StoredSeed? = null,
-    /** Null until the first load; the card is hidden rather than showing zeros. */
-    val streak: Streak? = null,
+    /** Always present: cached locally, so a dead backend cannot hide the card. */
+    val streak: Streak = Streak(),
 ) {
     val backendConfigured: Boolean get() = baseUrl.isNotEmpty()
 
@@ -101,7 +101,10 @@ class IdeasActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         repository = IdeaBankRepository(this)
-        state = state.copy(baseUrl = repository.backendConfig.baseUrl)
+        state = state.copy(
+            baseUrl = repository.backendConfig.baseUrl,
+            streak = repository.cachedStreak(),
+        )
 
         setContent {
             FeedRunnerTheme {
@@ -164,7 +167,7 @@ class IdeasActivity : ComponentActivity() {
         lifecycleScope.launch {
             val outcome = withContext(Dispatchers.IO) { repository.loadSeeds(filter) }
             val pending = withContext(Dispatchers.IO) { repository.pendingCount }
-            val streak = withContext(Dispatchers.IO) { repository.loadStreak().getOrNull() }
+            val streak = withContext(Dispatchers.IO) { repository.streak() }
 
             state = outcome.fold(
                 onSuccess = { seeds ->
@@ -173,7 +176,7 @@ class IdeasActivity : ComponentActivity() {
                         loading = false,
                         pendingCount = pending,
                         serverReachable = true,
-                        streak = streak ?: state.streak,
+                        streak = streak,
                     )
                 },
                 onFailure = { error ->
@@ -185,6 +188,8 @@ class IdeasActivity : ComponentActivity() {
                         loading = false,
                         pendingCount = pending,
                         serverReachable = false,
+                        // Cached, so the streak survives the backend being away.
+                        streak = streak,
                         message = error.message ?: "Could not reach the backend",
                     )
                 },
