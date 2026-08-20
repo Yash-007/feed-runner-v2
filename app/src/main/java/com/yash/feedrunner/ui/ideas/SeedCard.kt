@@ -41,6 +41,9 @@ import com.yash.feedrunner.ui.SeedStatus
 import com.yash.feedrunner.ui.StoredSeed
 import com.yash.feedrunner.ui.relativeAge
 import com.yash.feedrunner.ui.theme.MetaTextStyle
+import com.yash.feedrunner.ui.theme.Space
+import com.yash.feedrunner.ui.theme.Radius
+import com.yash.feedrunner.ui.theme.HairlineCard
 
 /**
  * One banked seed.
@@ -56,14 +59,11 @@ import com.yash.feedrunner.ui.theme.MetaTextStyle
  */
 @Composable
 internal fun SeedCard(seed: StoredSeed, onOpen: () -> Unit) {
-    Surface(
-        shape = RoundedCornerShape(16.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(enabled = !seed.isPending, onClick = onOpen),
+    HairlineCard(
+        modifier = Modifier.fillMaxWidth(),
+        onClick = if (seed.isPending) null else onOpen,
     ) {
-        Column(modifier = Modifier.padding(14.dp)) {
+        Column(modifier = Modifier.padding(Space.lg)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 ChipRow(seed = seed, modifier = Modifier.weight(1f))
                 Text(
@@ -80,9 +80,10 @@ internal fun SeedCard(seed: StoredSeed, onOpen: () -> Unit) {
                     Text(
                         text = seed.headline,
                         style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurface,
                         maxLines = 3,
                         overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.padding(top = 8.dp),
+                        modifier = Modifier.padding(top = Space.md),
                     )
 
                     if (seed.seed.themeTags.isNotEmpty()) {
@@ -92,7 +93,7 @@ internal fun SeedCard(seed: StoredSeed, onOpen: () -> Unit) {
                             color = MaterialTheme.colorScheme.primary,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.padding(top = 6.dp),
+                            modifier = Modifier.padding(top = Space.sm),
                         )
                     }
                 }
@@ -106,7 +107,7 @@ internal fun SeedCard(seed: StoredSeed, onOpen: () -> Unit) {
                     style = MetaTextStyle,
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.padding(top = 7.dp),
+                    modifier = Modifier.padding(top = Space.sm),
                 )
             }
         }
@@ -153,16 +154,16 @@ private fun ChipRow(seed: StoredSeed, modifier: Modifier = Modifier) {
 @Composable
 private fun Chip(text: String, container: Color, content: Color, border: Color? = null) {
     Surface(
-        shape = RoundedCornerShape(6.dp),
+        shape = RoundedCornerShape(Radius.chip),
         color = container,
-        border = border?.let { BorderStroke(1.dp, it) },
+        border = border?.let { BorderStroke(Space.hair, it) },
     ) {
         Text(
             text = text,
-            fontSize = 9.sp,
+            fontSize = 10.sp,
             fontWeight = FontWeight.SemiBold,
             color = content,
-            modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp),
+            modifier = Modifier.padding(horizontal = Space.sm, vertical = 3.dp),
         )
     }
 }

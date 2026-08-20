@@ -227,7 +227,7 @@ internal fun PrimaryButton(
                 MaterialTheme.colorScheme.primary.copy(alpha = if (enabled) 1f else 0.4f),
             )
             .clickable(enabled = enabled, onClick = onClick)
-            .padding(horizontal = Space.xl, vertical = Space.md),
+            .padding(horizontal = Space.lg, vertical = Space.md),
     ) {
         Text(
             text = label,
@@ -253,7 +253,7 @@ internal fun SecondaryButton(
             .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.10f))
             .border(Space.hair, MaterialTheme.colorScheme.primary.copy(alpha = 0.25f), shape)
             .clickable(enabled = enabled, onClick = onClick)
-            .padding(horizontal = Space.xl, vertical = Space.md),
+            .padding(horizontal = Space.lg, vertical = Space.md),
     ) {
         Text(
             text = label,
@@ -288,6 +288,31 @@ internal fun RoundIconButton(
             color = MaterialTheme.colorScheme.onPrimary,
         )
     }
+}
+
+/**
+ * A chip that names a take: an angle, a register, a style.
+ *
+ * A pale wash of its own hue with the hue itself as the text. These used to be
+ * solid saturated blocks, which made them the loudest thing on a screen that is
+ * otherwise pastel and hairlines. The hue still does its job, which is why these
+ * are the one exception to using violet for everything.
+ */
+@Composable
+internal fun SoftAccentChip(
+    text: String,
+    hue: Color,
+    modifier: Modifier = Modifier,
+) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.labelMedium,
+        color = hue,
+        modifier = modifier
+            .clip(RoundedCornerShape(Radius.chip))
+            .background(hue.copy(alpha = 0.16f))
+            .padding(horizontal = Space.sm, vertical = Space.xs),
+    )
 }
 
 /** A single hairline, for splitting a card into rows. */

@@ -23,6 +23,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.yash.feedrunner.ui.Streak
 import com.yash.feedrunner.ui.theme.MetaTextStyle
+import com.yash.feedrunner.ui.theme.Space
+import com.yash.feedrunner.ui.theme.Radius
+import com.yash.feedrunner.ui.theme.HairlineCard
 
 /**
  * The daily reply habit.
@@ -36,24 +39,24 @@ import com.yash.feedrunner.ui.theme.MetaTextStyle
  */
 @Composable
 internal fun StreakCard(streak: Streak, modifier: Modifier = Modifier) {
-    Surface(
-        shape = RoundedCornerShape(16.dp),
-        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.09f),
+    // Deliberately not on a wash. The header band is directly above it, and two
+    // gradients touching read as one smear rather than two surfaces.
+    HairlineCard(
         modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(Radius.card),
     ) {
-        Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp)) {
+        Column(modifier = Modifier.padding(horizontal = Space.lg, vertical = Space.lg)) {
             Row(verticalAlignment = Alignment.Bottom) {
                 Text(
                     text = "${streak.today}",
-                    fontSize = 26.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary,
+                    style = MaterialTheme.typography.headlineMedium,
+                    color = MaterialTheme.colorScheme.onBackground,
                 )
                 Text(
                     text = if (streak.today == 1) " reply today" else " replies today",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(bottom = 3.dp),
+                    modifier = Modifier.padding(start = Space.xs, bottom = 4.dp),
                 )
                 Box(modifier = Modifier.weight(1f))
                 if (streak.current > 0) {
@@ -63,16 +66,16 @@ internal fun StreakCard(streak: Streak, modifier: Modifier = Modifier) {
                         fontWeight = FontWeight.SemiBold,
                         color = StreakAccent,
                         modifier = Modifier
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(StreakAccent.copy(alpha = 0.15f))
-                            .padding(horizontal = 10.dp, vertical = 5.dp),
+                            .clip(RoundedCornerShape(Radius.chip))
+                            .background(StreakAccent.copy(alpha = 0.18f))
+                            .padding(horizontal = Space.md, vertical = Space.xs),
                     )
                 }
             }
 
             DayStrip(
                 streak = streak,
-                modifier = Modifier.padding(top = 12.dp),
+                modifier = Modifier.padding(top = Space.lg),
             )
 
             if (streak.longest > 0) {
@@ -80,7 +83,7 @@ internal fun StreakCard(streak: Streak, modifier: Modifier = Modifier) {
                     text = "best ${streak.longest} days · ${streak.total} replies all time",
                     style = MetaTextStyle,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(top = 9.dp),
+                    modifier = Modifier.padding(top = Space.md),
                 )
             }
         }

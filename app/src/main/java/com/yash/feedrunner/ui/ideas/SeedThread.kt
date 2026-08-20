@@ -49,6 +49,14 @@ import com.yash.feedrunner.ui.ChatRole
 import com.yash.feedrunner.ui.SeedIdea
 import com.yash.feedrunner.ui.SeedStatus
 import com.yash.feedrunner.ui.StoredSeed
+import com.yash.feedrunner.ui.theme.Radius
+import com.yash.feedrunner.ui.theme.HairlineCard
+import com.yash.feedrunner.ui.theme.WashHeader
+import com.yash.feedrunner.ui.theme.Space
+import com.yash.feedrunner.ui.theme.MetaTextStyle
+import com.yash.feedrunner.ui.theme.SoftAccentChip
+import com.yash.feedrunner.ui.theme.RoundIconButton
+import com.yash.feedrunner.ui.theme.Hairline
 
 /**
  * One seed's ideation conversation.
@@ -223,8 +231,10 @@ private fun ThreadHeader(
 ) {
     var menuOpen by remember { mutableStateOf(false) }
 
-    Surface(tonalElevation = 2.dp) {
-        Column(modifier = Modifier.padding(start = 6.dp, end = 6.dp, top = 10.dp, bottom = 10.dp)) {
+    // The seed itself is the heading of this screen, so it gets the wash and the
+    // serif that a screen title gets everywhere else.
+    WashHeader {
+        Column(modifier = Modifier.padding(start = 6.dp, end = 6.dp, top = Space.md, bottom = Space.md)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     text = "‹",
@@ -237,8 +247,8 @@ private fun ThreadHeader(
                 )
                 Text(
                     text = seed.seed.themeTags.firstOrNull() ?: seed.source.label,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.weight(1f),
                 )
                 Box {
@@ -279,10 +289,25 @@ private fun ThreadHeader(
 
             SelectionContainer {
                 Column {
+                    // Sized by length. A short tension carries a full heading; a
+                    // long one at the same size ran to six lines and took half the
+                    // screen before you had read a single idea.
                     Text(
                         text = seed.headline,
-                        style = MaterialTheme.typography.bodyMedium,
-                        modifier = Modifier.padding(start = 12.dp, end = 8.dp, top = 2.dp),
+                        style = if (seed.headline.length > 90) {
+                            MaterialTheme.typography.headlineSmall.copy(
+                                fontSize = 19.sp,
+                                lineHeight = 26.sp,
+                            )
+                        } else {
+                            MaterialTheme.typography.headlineSmall
+                        },
+                        color = MaterialTheme.colorScheme.onBackground,
+                        modifier = Modifier.padding(
+                            start = Space.md,
+                            end = Space.md,
+                            top = Space.xs,
+                        ),
                     )
                     if (seed.seed.angleHint.isNotBlank()) {
                         Text(
@@ -375,31 +400,21 @@ private fun IdeaCard(idea: SeedIdea, onCopy: (String) -> Unit, onDelete: () -> U
         }
     }
 
-    Surface(
-        shape = RoundedCornerShape(14.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
-        modifier = Modifier.fillMaxWidth(),
-    ) {
-        Column(modifier = Modifier.padding(12.dp)) {
+    HairlineCard(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(Space.lg)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 if (idea.register.isNotBlank()) {
-                    Text(
+                    SoftAccentChip(
                         text = idea.registerLabel,
-                        fontSize = 9.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onPrimary,
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(5.dp))
-                            .background(registerColor(idea.register))
-                            .padding(horizontal = 6.dp, vertical = 2.dp),
+                        hue = registerColor(idea.register),
                     )
                 }
                 if (idea.play.isNotBlank()) {
                     Text(
                         text = idea.playLabel,
-                        fontSize = 9.sp,
+                        style = MetaTextStyle,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(start = 6.dp),
+                        modifier = Modifier.padding(start = Space.sm),
                     )
                 }
                 if (copied) {
@@ -480,10 +495,14 @@ private fun Composer(
     onValueChange: (String) -> Unit,
     onSend: () -> Unit,
 ) {
-    Surface(tonalElevation = 3.dp) {
+    // Flat with a hairline above it, not a raised bar.
+    Column {
+        Hairline()
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+            modifier = Modifier
+                .background(MaterialTheme.colorScheme.surface)
+                .padding(horizontal = Space.md, vertical = Space.md),
         ) {
             OutlinedTextField(
                 value = value,
@@ -496,7 +515,7 @@ private fun Composer(
                     )
                 },
                 textStyle = MaterialTheme.typography.bodyMedium,
-                shape = RoundedCornerShape(22.dp),
+                shape = RoundedCornerShape(Radius.control),
                 maxLines = 4,
                 colors = OutlinedTextFieldDefaults.colors(
                     unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
@@ -505,23 +524,13 @@ private fun Composer(
             )
             // Always enabled: an empty send is a plain generate, which is the most
             // common thing you want here.
-            Box(
-                contentAlignment = Alignment.Center,
-                modifier = Modifier
-                    .padding(start = 8.dp)
-                    .size(44.dp)
-                    .clip(RoundedCornerShape(22.dp))
-                    .background(
-                        MaterialTheme.colorScheme.primary.copy(alpha = if (enabled) 1f else 0.3f),
-                    )
-                    .clickable(enabled = enabled, onClick = onSend),
-            ) {
-                Text(
-                    text = "↑",
-                    color = MaterialTheme.colorScheme.onPrimary,
-                    fontSize = 19.sp,
-                )
-            }
+            RoundIconButton(
+                glyph = "↑",
+                diameter = 44.dp,
+                enabled = enabled,
+                onClick = onSend,
+                modifier = Modifier.padding(start = Space.sm),
+            )
         }
     }
 }

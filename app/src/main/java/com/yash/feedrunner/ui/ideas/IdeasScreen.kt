@@ -62,6 +62,13 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.KeyboardActions
+import com.yash.feedrunner.ui.theme.WashHeader
+import com.yash.feedrunner.ui.theme.Space
+import com.yash.feedrunner.ui.theme.SecondaryButton
+import com.yash.feedrunner.ui.theme.Radius
+import com.yash.feedrunner.ui.theme.PrimaryButton
+import com.yash.feedrunner.ui.theme.Hairline
+import androidx.compose.foundation.BorderStroke
 
 /**
  * The Idea Bank.
@@ -169,12 +176,20 @@ fun IdeasScreen(state: IdeasUiState, actions: IdeasActions) {
 
 @Composable
 private fun Header(pendingCount: Int, serverReachable: Boolean?, onEditAddress: () -> Unit) {
-    Column(modifier = Modifier.padding(start = 16.dp, end = 8.dp, top = 18.dp)) {
+    WashHeader {
+      Column(
+          modifier = Modifier.padding(
+              start = Space.lg,
+              end = Space.sm,
+              top = Space.xl,
+              bottom = Space.lg,
+          ),
+      ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
                 text = "Ideas",
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold,
+                style = MaterialTheme.typography.displaySmall,
+                color = MaterialTheme.colorScheme.onBackground,
                 modifier = Modifier.weight(1f),
             )
             // A dot beats a word: the only thing worth knowing at a glance is
@@ -212,10 +227,11 @@ private fun Header(pendingCount: Int, serverReachable: Boolean?, onEditAddress: 
             } else {
                 "Saved from your replies and posts · pull down to refresh"
             },
-            style = MaterialTheme.typography.bodySmall,
+            style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(bottom = 2.dp),
+            modifier = Modifier.padding(top = Space.xs),
         )
+      }
     }
 }
 
@@ -265,12 +281,16 @@ private fun FilterBar(
 
 @Composable
 private fun FilterChip(label: String, active: Boolean, onClick: () -> Unit) {
+    // Solid violet when it is on, a hairline outline when it is not. Both states
+    // occupy the same box, so switching between them does not shift the row.
+    val shape = RoundedCornerShape(Radius.chip)
     Surface(
-        shape = RoundedCornerShape(16.dp),
-        color = if (active) {
-            MaterialTheme.colorScheme.primary
+        shape = shape,
+        color = if (active) MaterialTheme.colorScheme.primary else Color.Transparent,
+        border = if (active) {
+            null
         } else {
-            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+            BorderStroke(Space.hair, MaterialTheme.colorScheme.outlineVariant)
         },
         modifier = Modifier.clickable(onClick = onClick),
     ) {
@@ -282,7 +302,7 @@ private fun FilterChip(label: String, active: Boolean, onClick: () -> Unit) {
             } else {
                 MaterialTheme.colorScheme.onSurfaceVariant
             },
-            modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp),
+            modifier = Modifier.padding(horizontal = Space.md, vertical = Space.sm),
         )
     }
 }
@@ -298,37 +318,43 @@ private fun TagChip(label: String, active: Boolean, onClick: () -> Unit) {
             MaterialTheme.colorScheme.primary
         },
         modifier = Modifier
-            .clip(RoundedCornerShape(14.dp))
+            .clip(RoundedCornerShape(Radius.chip))
             .background(
                 if (active) {
                     MaterialTheme.colorScheme.primaryContainer
                 } else {
-                    MaterialTheme.colorScheme.primary.copy(alpha = 0.09f)
+                    MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)
                 },
             )
             .clickable(onClick = onClick)
-            .padding(horizontal = 11.dp, vertical = 6.dp),
+            .padding(horizontal = Space.sm, vertical = Space.xs),
     )
 }
 
 @Composable
 private fun BottomBar(onAddManual: () -> Unit) {
-    Surface(tonalElevation = 3.dp, modifier = Modifier.fillMaxWidth()) {
+    // Flat, separated by a line rather than a shadow, like everything else now.
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Hairline()
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 10.dp),
+                .background(MaterialTheme.colorScheme.surface)
+                .padding(horizontal = Space.lg, vertical = Space.md),
         ) {
             Text(
-                text = "Tap a seed to write posts from it",
+                text = "Tap a seed to write from it",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.weight(1f),
+                maxLines = 2,
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(end = Space.md),
             )
             // Your own ideas belong in the same bank as the captured ones, so this
             // sits next to them rather than behind a menu.
-            Button(onClick = onAddManual) { Text("+  My own idea") }
+            PrimaryButton(label = "+  My own idea", onClick = onAddManual)
         }
     }
 }
@@ -357,15 +383,17 @@ private fun EmptyState(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             if (!configured) {
-                Button(
+                PrimaryButton(
+                    label = "Set address",
+                    modifier = Modifier.padding(top = Space.lg),
                     onClick = onEditAddress,
-                    modifier = Modifier.padding(top = 16.dp),
-                ) { Text("Set address") }
+                )
             } else if (filtered) {
-                TextButton(
+                SecondaryButton(
+                    label = "Clear filters",
+                    modifier = Modifier.padding(top = Space.md),
                     onClick = onClearFilters,
-                    modifier = Modifier.padding(top = 8.dp),
-                ) { Text("Clear filters") }
+                )
             }
         }
     }
