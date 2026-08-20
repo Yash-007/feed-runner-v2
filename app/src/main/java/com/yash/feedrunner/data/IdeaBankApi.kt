@@ -38,7 +38,11 @@ class IdeaBankException(
  * is six small endpoints. Every call blocks, so callers run them off the main
  * thread.
  */
-class IdeaBankApi(private val config: BackendConfig) {
+class IdeaBankApi(
+    private val config: BackendConfig,
+    /** Optional so tests and one-off calls need not carry storage. */
+    private val cache: SeedCache? = null,
+) {
 
     fun health(): Boolean = runCatching {
         val body = request("GET", "/healthz", null)
@@ -55,7 +59,14 @@ class IdeaBankApi(private val config: BackendConfig) {
     fun listSeeds(status: SeedStatus? = null): List<StoredSeed> {
         val path = if (status == null) "/seeds" else "/seeds?status=${status.wire}"
         val array = request("GET", path, null).optJSONArray("seeds") ?: JSONArray()
-        return (0 until array.length()).mapNotNull { array.optJSONObject(it)?.toRemoteSeed() }
+        cache?.save(status, array.toString())
+        return array.toSeeds()
+    }
+
+    /** The last answer for this filter, for when nothing answers now. */
+    fun cachedSeeds(status: SeedStatus? = null): List<StoredSeed> {
+        val raw = cache?.load(status) ?: return emptyList()
+        return runCatching { JSONArray(raw).toSeeds() }.getOrDefault(emptyList())
     }
 
     fun setStatus(remoteId: String, status: SeedStatus): StoredSeed {
@@ -269,6 +280,9 @@ class IdeaBankApi(private val config: BackendConfig) {
 }
 
 /** Parses a seed document as the server returns it, including its assigned id. */
+private fun JSONArray.toSeeds(): List<StoredSeed> =
+    (0 until length()).mapNotNull { optJSONObject(it)?.toRemoteSeed() }
+
 private fun JSONObject.toRemoteSeed(): StoredSeed? = runCatching {
     val tagsArray = optJSONArray("theme_tags")
     val tags = (0 until (tagsArray?.length() ?: 0)).mapNotNull { i ->

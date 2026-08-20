@@ -38,7 +38,7 @@ Earlier asks, all shipped: chat bar writing/selecting/copying everywhere,
   [x] C8  refine on one card: shorter / funnier / specific / spicier replaces that card
   [x] C9  Sticky context bar appears once scrolled, "top" jumps back up  (text bled through it, fixed)
   [x] C10 Close, reopen from Last result: same drafts, used markers intact
-  [ ] C11 Hold (scroll and capture) stitches a long thread and reads it whole
+  [x] C11 Hold (scroll and capture) stitches a long thread and reads it whole
 
 
 ## D. Reply chat
@@ -49,35 +49,35 @@ Earlier asks, all shipped: chat bar writing/selecting/copying everywhere,
   [x] D4  Angle chips (funnier, add, extend, appreciate, push back) each return 4-5 drafts
   [x] D5  Quick prompts (another angle, hinglish, shorter one liner) work  (were hidden for good after the first send, fixed)
   [x] D6  Jump to bottom button appears only when scrolled up  (overlapped the send button, fixed)
-  [ ] D7  Error state reads plainly and offers retry
+  [x] D7  Error state reads plainly and offers retry
 
 
 ## E. Post and quote (Repost)
 
-  [ ] E1  Repost captures the current screen every time, never the previous one
-  [ ] E2  Post / Quote toggle explains what each does
+  [x] E1  Repost captures the current screen every time, never the previous one
+  [x] E2  Post / Quote toggle explains what each does
   [ ] E3  Held drafts banner offers the earlier set without a new API call
-  [ ] E4  "Your thought or an instruction" is optional, and a directive is obeyed
-  [ ] E5  Quick chips (make it funny, hinglish, one liner, tell the story) fill it
-  [ ] E6  Draft posts arrive with style chip and gist
+  [x] E4  "Your thought or an instruction" is optional, and a directive is obeyed
+  [x] E5  Quick chips (make it funny, hinglish, one liner, tell the story) fill it
+  [x] E6  Draft posts arrive with style chip and gist
   [ ] E7  Long press a draft: Copy / Select all
-  [ ] E8  Tap copies and marks used, unmark works
-  [ ] E9  Chat below asks for a different quote and appends
-  [ ] E10 Capture preview is big enough to check before spending a call
+  [x] E8  Tap copies and marks used, unmark works
+  [x] E9  Chat below asks for a different quote and appends
+  [x] E10 Capture preview is big enough to check before spending a call
 
 
 ## F. Ideas screen
 
   [x] F1  Streak card: today's count, run, fourteen bars, best and all time
-  [ ] F2  Streak survives the backend being unreachable, and counts a fresh pick
-  [ ] F3  server dot reflects reachability, Set address dialog fixes a moved laptop
+  [x] F2  Streak survives the backend being unreachable, and counts a fresh pick
+  [x] F3  server dot reflects reachability, Set address dialog fixes a moved laptop
   [x] F4  Status filters (all, new, posted, skipped) and topic chips both filter
   [x] F5  Clear filters shows when a filter hides everything
-  [x] F6  Pull down refreshes
+  [x] F6  Pull down refreshes  (indicator was hidden behind the chips, fixed)
   [x] F7  Seed card shows source, status, shelf life, age, topics, idea count
   [x] F8  Long press seed text selects and copies
   [x] F9  + My own idea saves a seed and it appears in the list  (now opens focused)
-  [ ] F10 Offline: list still renders from cache, actions queue
+  [x] F10 Offline: list still renders from cache, actions queue  (was empty offline, now cached)
 
 
 ## G. Seed thread
@@ -99,7 +99,7 @@ Earlier asks, all shipped: chat bar writing/selecting/copying everywhere,
   [ ] H1  Selection: bar appears everywhere, dismisses on tap away, nothing sticks
   [ ] H2  Light and dark both readable, follows the system
   [ ] H3  Nothing sits under the status bar or nav bar, no clipped controls
-  [ ] H4  API failure anywhere says what happened and lets you retry
-  [ ] H5  Backend down never blocks a reply or a post
+  [x] H4  API failure anywhere says what happened and lets you retry  (said "Request failed: Request failed", fixed)
+  [x] H5  Backend down never blocks a reply or a post
   [ ] H6  No draft or chat is ever lost by closing a panel
   [ ] H7  Reopening the app lands where it should, nothing half drawn

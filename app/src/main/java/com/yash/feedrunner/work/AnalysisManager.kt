@@ -7,7 +7,7 @@ import android.os.Looper
 import android.util.Log
 import com.yash.feedrunner.BuildConfig
 import com.yash.feedrunner.api.ClaudeClient
-import com.yash.feedrunner.api.ClaudeException
+import com.yash.feedrunner.api.humanMessage
 import com.yash.feedrunner.api.ImagePrep
 import com.yash.feedrunner.data.IdeaBankRepository
 import com.yash.feedrunner.data.ResultStore
@@ -137,11 +137,7 @@ class AnalysisManager(
         handler.post { onActiveCountChanged?.invoke(count) }
     }
 
-    private fun userMessage(error: Throwable): String = when (error) {
-        is ClaudeException -> error.message ?: "Something went wrong."
-        else -> error.message?.takeIf { it.isNotBlank() }?.let { "Request failed: $it" }
-            ?: "Request failed. Check your connection."
-    }
+    private fun userMessage(error: Throwable): String = humanMessage(error)
 
     private companion object {
         const val TAG = "AnalysisManager"

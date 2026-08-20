@@ -16,6 +16,7 @@ import androidx.compose.runtime.setValue
 import com.yash.feedrunner.BuildConfig
 import com.yash.feedrunner.api.ClaudeClient
 import com.yash.feedrunner.api.ClaudeException
+import com.yash.feedrunner.api.humanMessage
 import com.yash.feedrunner.api.ImagePrep
 import com.yash.feedrunner.data.DraftPick
 import com.yash.feedrunner.data.IdeaBankRepository
@@ -212,12 +213,7 @@ class RepostController(
                     }
                     .onFailure { error ->
                         Log.w(TAG, "Post generation failed", error)
-                        val message = when (error) {
-                            is ClaudeException -> error.message ?: "Something went wrong."
-                            else -> error.message?.takeIf { it.isNotBlank() }
-                                ?.let { "Request failed: $it" }
-                                ?: "Request failed. Check your connection."
-                        }
+                        val message = humanMessage(error)
                         if (window.isShowing) {
                             state = RepostState.Error(message)
                         } else {
@@ -281,8 +277,7 @@ class RepostController(
                             // is easy to miss, which reads as no answer arriving.
                             state = current.copy(
                                 chatPending = false,
-                                chatError = (error as? ClaudeException)?.message
-                                    ?: "Chat failed. Check your connection.",
+                                chatError = humanMessage(error),
                             )
                         }
                     }

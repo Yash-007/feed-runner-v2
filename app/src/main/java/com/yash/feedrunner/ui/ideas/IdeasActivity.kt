@@ -191,9 +191,9 @@ class IdeasActivity : ComponentActivity() {
                     )
                 },
                 onFailure = { error ->
-                    // Falling back to the queue rather than an empty screen: those
-                    // seeds exist, they just have not reached the server.
-                    val queued = withContext(Dispatchers.IO) { repository.queuedSeeds() }
+                    // Falling back to the last list plus the queue rather than an
+                    // empty screen: those seeds exist, they just are not reachable.
+                    val queued = withContext(Dispatchers.IO) { repository.queuedSeeds(filter) }
                     state.copy(
                         seeds = queued,
                         loading = false,

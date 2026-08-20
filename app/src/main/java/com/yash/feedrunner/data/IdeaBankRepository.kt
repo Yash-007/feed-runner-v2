@@ -24,7 +24,7 @@ class IdeaBankRepository(context: Context) {
     private val pickOutbox = PickOutbox(context)
     private val streakStore = StreakStore(context)
     private val config = BackendConfig(context)
-    private val api = IdeaBankApi(config)
+    private val api = IdeaBankApi(config, SeedCache(context))
 
     // Single thread: uploads are ordered and none of this is latency-sensitive.
     private val worker = Executors.newSingleThreadExecutor()
@@ -198,8 +198,20 @@ class IdeaBankRepository(context: Context) {
             }
     }
 
-    /** Used when the server cannot be reached, so the screen still shows something. */
-    fun queuedSeeds(): List<StoredSeed> = outbox.pending().sortedByDescending { it.createdAtMillis }
+    /**
+     * What to show when the server cannot be reached: the last list it gave us, plus
+     * anything still waiting to be sent. Read only in effect, but the bank is the
+     * reason to open the screen and it should still be there.
+     */
+    fun queuedSeeds(filter: SeedStatus? = null): List<StoredSeed> {
+        val queued = outbox.pending().filter { filter == null || filter == SeedStatus.NEW }
+        val cached = api.cachedSeeds(filter)
+        // A seed can be in both: queued because the upload has not landed, cached
+        // because an earlier fetch already saw it.
+        val queuedIds = queued.map { it.clientSeedId }.toSet()
+        return (queued + cached.filterNot { it.clientSeedId in queuedIds })
+            .sortedByDescending { it.createdAtMillis }
+    }
 
     fun setStatus(seed: StoredSeed, status: SeedStatus): Result<StoredSeed> {
         val id = seed.remoteId

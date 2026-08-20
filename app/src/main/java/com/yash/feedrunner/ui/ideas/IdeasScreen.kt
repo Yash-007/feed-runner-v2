@@ -76,6 +76,14 @@ fun IdeasScreen(state: IdeasUiState, actions: IdeasActions) {
     var showManualDialog by remember { mutableStateOf(false) }
     var showAddressDialog by remember { mutableStateOf(false) }
 
+    // The whole screen is the pull target, not just the list. Wrapping only the list
+    // put the indicator behind the filter chips, where it was invisible and the
+    // gesture had to start halfway down the screen to work at all.
+    PullToRefreshBox(
+        isRefreshing = state.loading,
+        onRefresh = actions.onRefresh,
+        modifier = Modifier.fillMaxSize(),
+    ) {
     Column(modifier = Modifier.fillMaxSize()) {
         Header(
             pendingCount = state.pendingCount,
@@ -105,11 +113,7 @@ fun IdeasScreen(state: IdeasUiState, actions: IdeasActions) {
             )
         }
 
-        PullToRefreshBox(
-            isRefreshing = state.loading,
-            onRefresh = actions.onRefresh,
-            modifier = Modifier.weight(1f),
-        ) {
+        Box(modifier = Modifier.weight(1f)) {
             if (state.visibleSeeds.isEmpty() && !state.loading) {
                 EmptyState(
                     configured = state.backendConfigured,
@@ -130,6 +134,7 @@ fun IdeasScreen(state: IdeasUiState, actions: IdeasActions) {
         }
 
         BottomBar(onAddManual = { showManualDialog = true })
+    }
     }
 
     if (showManualDialog) {

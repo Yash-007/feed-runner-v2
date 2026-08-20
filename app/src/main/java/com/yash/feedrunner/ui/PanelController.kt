@@ -16,6 +16,7 @@ import androidx.compose.runtime.setValue
 import com.yash.feedrunner.BuildConfig
 import com.yash.feedrunner.api.ClaudeClient
 import com.yash.feedrunner.api.ClaudeException
+import com.yash.feedrunner.api.humanMessage
 import com.yash.feedrunner.data.ReadState
 import com.yash.feedrunner.data.IdeaBankRepository
 import com.yash.feedrunner.data.DraftPick
@@ -369,11 +370,7 @@ class PanelController(
         sendChat(message)
     }
 
-    private fun userMessage(error: Throwable): String = when (error) {
-        is ClaudeException -> error.message ?: "Something went wrong."
-        else -> error.message?.takeIf { it.isNotBlank() }?.let { "Request failed: $it" }
-            ?: "Request failed. Check your connection and retry."
-    }
+    private fun userMessage(error: Throwable): String = humanMessage(error)
 
     private fun updateDraft(draftId: Int, transform: (Draft) -> Draft) {
         val ready = state as? PanelState.Ready ?: return
