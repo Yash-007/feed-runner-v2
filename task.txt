@@ -56,11 +56,11 @@ Earlier asks, all shipped: chat bar writing/selecting/copying everywhere,
 
   [x] E1  Repost captures the current screen every time, never the previous one
   [x] E2  Post / Quote toggle explains what each does
-  [ ] E3  Held drafts banner offers the earlier set without a new API call
+  [x] E3  Held drafts banner offers the earlier set without a new API call
   [x] E4  "Your thought or an instruction" is optional, and a directive is obeyed
   [x] E5  Quick chips (make it funny, hinglish, one liner, tell the story) fill it
   [x] E6  Draft posts arrive with style chip and gist
-  [ ] E7  Long press a draft: Copy / Select all
+  [x] E7  Long press a draft: Copy / Select all
   [x] E8  Tap copies and marks used, unmark works
   [x] E9  Chat below asks for a different quote and appends
   [x] E10 Capture preview is big enough to check before spending a call
@@ -96,10 +96,10 @@ Earlier asks, all shipped: chat bar writing/selecting/copying everywhere,
 
 ## H. Cross cutting
 
-  [ ] H1  Selection: bar appears everywhere, dismisses on tap away, nothing sticks
-  [ ] H2  Light and dark both readable, follows the system
-  [ ] H3  Nothing sits under the status bar or nav bar, no clipped controls
+  [x] H1  Selection: bar appears everywhere, dismisses on tap away, nothing sticks
+  [x] H2  Light and dark both readable, follows the system
+  [x] H3  Nothing sits under the status bar or nav bar, no clipped controls  (keyboard cut the Draft button, fixed)
   [x] H4  API failure anywhere says what happened and lets you retry  (said "Request failed: Request failed", fixed)
   [x] H5  Backend down never blocks a reply or a post
-  [ ] H6  No draft or chat is ever lost by closing a panel
-  [ ] H7  Reopening the app lands where it should, nothing half drawn
+  [x] H6  No draft or chat is ever lost by closing a panel
+  [x] H7  Reopening the app lands where it should, nothing half drawn

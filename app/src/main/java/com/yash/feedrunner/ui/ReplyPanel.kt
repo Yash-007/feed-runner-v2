@@ -150,7 +150,15 @@ fun ReplyPanel(
                 }
               }
 
+              // Same story as the compose sheet: this window reports no insets, the
+              // keyboard resizes it instead, and the resize lands after the focus
+              // event. Following maxValue keeps the composer you are typing in from
+              // being cut off by the new window edge.
               bodyScroll?.let { scroll ->
+                  LaunchedEffect(chatFocused, scroll.maxValue) {
+                      if (chatFocused) scroll.animateScrollTo(scroll.maxValue)
+                  }
+
                   JumpToBottom(
                       visible = !chatFocused && scroll.maxValue > 0 &&
                           scroll.value < scroll.maxValue - JUMP_VISIBLE_SLOP,

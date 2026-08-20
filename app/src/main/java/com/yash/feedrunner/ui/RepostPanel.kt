@@ -16,8 +16,10 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
@@ -106,6 +108,17 @@ fun RepostPanel(
     val trackFocus: (Boolean) -> Unit = { focused ->
         inputFocused = focused
         onFocusChanged(focused)
+    }
+
+    // Keep the bottom in view the whole time the keyboard is up.
+    //
+    // This window reports no insets at all, so imePadding cannot help; what actually
+    // happens is that the keyboard resizes the window under us. The content is then
+    // taller than the window and the Draft button, being last, ended up cut in half
+    // by the window edge. Keyed on maxValue because the resize lands a frame or two
+    // after the focus event, so scrolling once on focus used a stale value.
+    LaunchedEffect(inputFocused, scrollState.maxValue) {
+        if (inputFocused) scrollState.animateScrollTo(scrollState.maxValue)
     }
 
     // Drop to the drafts as soon as they land; the composer is above them. Keyed
@@ -581,6 +594,7 @@ private fun Composer(
                         RepostMode.POST -> "Draft 6 posts"
                         RepostMode.QUOTE -> "Draft 6 quote posts"
                     },
+
                     color = MaterialTheme.colorScheme.onPrimary,
                     style = MaterialTheme.typography.labelLarge,
                     fontWeight = FontWeight.SemiBold,
