@@ -51,6 +51,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
+import com.yash.feedrunner.ui.theme.RoundIconButton
+import com.yash.feedrunner.ui.theme.Space
+import com.yash.feedrunner.ui.theme.Radius
 
 /**
  * The follow-up conversation, shared by the reply sheet and the compose sheet.
@@ -248,10 +251,10 @@ private fun AngleChips(angles: List<Angle>, enabled: Boolean, onPick: (Angle) ->
                 fontWeight = FontWeight.SemiBold,
                 color = angle.color.copy(alpha = alpha),
                 modifier = Modifier
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(angle.color.copy(alpha = 0.14f * alpha))
+                    .clip(RoundedCornerShape(Radius.chip))
+                    .background(angle.color.copy(alpha = 0.16f * alpha))
                     .clickable(enabled = enabled) { onPick(angle) }
-                    .padding(horizontal = 12.dp, vertical = 7.dp),
+                    .padding(horizontal = Space.md, vertical = Space.sm),
             )
         }
     }
@@ -272,10 +275,10 @@ private fun QuickPrompts(prompts: List<String>, onPick: (String) -> Unit) {
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.primary,
                 modifier = Modifier
-                    .clip(RoundedCornerShape(16.dp))
+                    .clip(RoundedCornerShape(Radius.chip))
                     .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.10f))
                     .clickable { onPick(prompt) }
-                    .padding(horizontal = 12.dp, vertical = 7.dp),
+                    .padding(horizontal = Space.md, vertical = Space.sm),
             )
         }
     }
@@ -401,7 +404,7 @@ private fun ChatInput(
                 Text("message", style = MaterialTheme.typography.bodyMedium)
             },
             textStyle = MaterialTheme.typography.bodyMedium,
-            shape = RoundedCornerShape(22.dp),
+            shape = RoundedCornerShape(Radius.control),
             maxLines = 4,
             colors = OutlinedTextFieldDefaults.colors(
                 unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
@@ -410,19 +413,13 @@ private fun ChatInput(
                 .weight(1f)
                 .onFocusChanged { onFocusChanged(it.isFocused) },
         )
-        Box(
-            contentAlignment = Alignment.Center,
-            modifier = Modifier
-                .padding(start = 8.dp)
-                .size(42.dp)
-                .clip(CircleShape)
-                .background(
-                    MaterialTheme.colorScheme.primary.copy(alpha = if (canSend) 1f else 0.25f),
-                )
-                .clickable(enabled = canSend, onClick = onSend),
-        ) {
-            Text(text = "↑", color = MaterialTheme.colorScheme.onPrimary, fontSize = 19.sp)
-        }
+        RoundIconButton(
+            glyph = "↑",
+            diameter = 42.dp,
+            enabled = canSend,
+            onClick = onSend,
+            modifier = Modifier.padding(start = Space.sm),
+        )
     }
 }
 

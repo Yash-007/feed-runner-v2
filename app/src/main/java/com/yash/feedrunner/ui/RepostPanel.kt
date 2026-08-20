@@ -64,6 +64,12 @@ import androidx.compose.ui.unit.sp
 import com.yash.feedrunner.ui.theme.MetaTextStyle
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import androidx.compose.foundation.border
+import com.yash.feedrunner.ui.theme.WashHeader
+import com.yash.feedrunner.ui.theme.Space
+import com.yash.feedrunner.ui.theme.SoftAccentChip
+import com.yash.feedrunner.ui.theme.Radius
+import com.yash.feedrunner.ui.theme.HairlineCard
 
 private val SheetShape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp)
 
@@ -143,7 +149,12 @@ fun RepostPanel(
         Surface(
             shape = SheetShape,
             color = MaterialTheme.colorScheme.surface,
-            tonalElevation = 8.dp,
+            // Shadow, not tonal elevation. Tonal tints the surface with the accent,
+            // which on a white surface reads as a lavender cast over every draft.
+            // The sheet does genuinely float over another app, so it earns a shadow
+            // even though nothing inside it has one.
+            tonalElevation = 0.dp,
+            shadowElevation = 16.dp,
             modifier = Modifier
                 .fillMaxWidth()
                 .heightIn(max = 620.dp)
@@ -152,24 +163,39 @@ fun RepostPanel(
         ) {
             SelectionActionsHost {
             Box {
-                Column(
-                    modifier = Modifier
-                        .verticalScroll(scrollState)
-                        .padding(16.dp),
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text(
-                            text = "Compose",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.weight(1f),
-                        )
-                        TextButton(onClick = onDismiss) { Text("Close") }
+                Column(modifier = Modifier.verticalScroll(scrollState)) {
+                    // A band behind the title only, same as the reply sheet.
+                    WashHeader {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(
+                                    start = Space.lg,
+                                    end = Space.sm,
+                                    top = Space.md,
+                                    bottom = Space.md,
+                                ),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                text = "Compose",
+                                style = MaterialTheme.typography.headlineSmall,
+                                color = MaterialTheme.colorScheme.onBackground,
+                                modifier = Modifier.weight(1f),
+                            )
+                            Text(
+                                text = "Close",
+                                style = MaterialTheme.typography.labelLarge,
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(Radius.chip))
+                                    .clickable(onClick = onDismiss)
+                                    .padding(horizontal = Space.md, vertical = Space.sm),
+                            )
+                        }
                     }
 
+                    Column(modifier = Modifier.padding(Space.lg)) {
                     if (heldDraftsAge != null) {
                         HeldDraftsBanner(age = heldDraftsAge, onOpen = onOpenHeldDrafts)
                     }
@@ -235,6 +261,7 @@ fun RepostPanel(
                             )
                         }
                     }
+                    }
                 }
 
                 JumpToBottom(
@@ -266,11 +293,16 @@ private fun HeldDraftsBanner(age: String, onOpen: () -> Unit) {
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
             .fillMaxWidth()
-            .padding(top = 10.dp)
-            .clip(RoundedCornerShape(10.dp))
-            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.10f))
+            .padding(top = Space.md)
+            .clip(RoundedCornerShape(Radius.control))
+            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.08f))
+            .border(
+                Space.hair,
+                MaterialTheme.colorScheme.primary.copy(alpha = 0.22f),
+                RoundedCornerShape(Radius.control),
+            )
             .clickable(onClick = onOpen)
-            .padding(horizontal = 10.dp, vertical = 8.dp),
+            .padding(horizontal = Space.md, vertical = Space.md),
     ) {
         Text(
             text = "Last drafts from $age",
@@ -328,13 +360,17 @@ private fun ModeToggle(
     enabled: Boolean,
     onModeChange: (RepostMode) -> Unit,
 ) {
+    // A track drawn with a hairline, and the chosen half filled with the accent.
+    // The old version tinted the whole track and lifted the selection with a
+    // lighter fill, which relies on shadow and elevation this design does not use.
+    val trackShape = RoundedCornerShape(Radius.control)
     Row(
         modifier = Modifier
-            .padding(top = 12.dp)
+            .padding(top = Space.md)
             .fillMaxWidth()
-            .clip(RoundedCornerShape(22.dp))
-            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
-            .padding(3.dp),
+            .clip(trackShape)
+            .border(Space.hair, MaterialTheme.colorScheme.outlineVariant, trackShape)
+            .padding(Space.xs),
     ) {
         RepostMode.entries.forEach { option ->
             val selected = option == mode
@@ -342,19 +378,22 @@ private fun ModeToggle(
                 contentAlignment = Alignment.Center,
                 modifier = Modifier
                     .weight(1f)
-                    .clip(RoundedCornerShape(19.dp))
+                    .clip(RoundedCornerShape(Radius.chip))
                     .background(
-                        if (selected) MaterialTheme.colorScheme.surface else Color.Transparent,
+                        if (selected) {
+                            MaterialTheme.colorScheme.primary
+                        } else {
+                            Color.Transparent
+                        },
                     )
                     .clickable(enabled = enabled && !selected) { onModeChange(option) }
-                    .padding(vertical = 9.dp),
+                    .padding(vertical = Space.sm),
             ) {
                 Text(
                     text = option.label,
                     style = MaterialTheme.typography.labelLarge,
-                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
                     color = if (selected) {
-                        MaterialTheme.colorScheme.onSurface
+                        MaterialTheme.colorScheme.onPrimary
                     } else {
                         MaterialTheme.colorScheme.onSurfaceVariant
                     },
@@ -380,10 +419,14 @@ private fun CapturedRow(capturePath: String?, onView: (String) -> Unit) {
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
             .fillMaxWidth()
-            .padding(top = 12.dp, bottom = 14.dp)
-            .clip(RoundedCornerShape(12.dp))
-            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f))
-            .padding(8.dp),
+            .padding(top = Space.md, bottom = Space.lg)
+            .clip(RoundedCornerShape(Radius.card))
+            .border(
+                Space.hair,
+                MaterialTheme.colorScheme.outlineVariant,
+                RoundedCornerShape(Radius.card),
+            )
+            .padding(Space.md),
     ) {
         if (preview != null && capturePath != null) {
             Image(
@@ -581,10 +624,10 @@ private fun Composer(
         }
 
         Surface(
-            shape = RoundedCornerShape(22.dp),
+            shape = RoundedCornerShape(Radius.control),
             color = MaterialTheme.colorScheme.primary.copy(alpha = if (enabled) 1f else 0.4f),
             modifier = Modifier
-                .padding(top = 12.dp)
+                .padding(top = Space.md)
                 .fillMaxWidth()
                 .clickable(enabled = enabled, onClick = onGenerate),
         ) {
@@ -762,23 +805,13 @@ private fun PostDraftCard(
     val haptics = LocalHapticFeedback.current
 
     Column(modifier = Modifier.padding(vertical = 5.dp)) {
-        Surface(
-            shape = RoundedCornerShape(14.dp),
-            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-            modifier = Modifier.fillMaxWidth(),
-        ) {
+        HairlineCard(modifier = Modifier.fillMaxWidth()) {
             val body = @Composable {
-                Column(modifier = Modifier.padding(12.dp)) {
+                Column(modifier = Modifier.padding(Space.lg)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            text = draft.style.label,
-                            color = Color.White,
-                            fontSize = 9.sp,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(4.dp))
-                                .background(draft.style.color)
-                                .padding(horizontal = 6.dp, vertical = 2.dp),
+                        SoftAccentChip(
+                            text = draft.style.label.lowercase(),
+                            hue = draft.style.color,
                         )
                         if (draft.thought.isNotEmpty()) {
                             Text(

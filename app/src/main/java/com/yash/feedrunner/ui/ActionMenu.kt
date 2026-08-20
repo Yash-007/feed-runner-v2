@@ -40,6 +40,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.yash.feedrunner.ui.theme.Space
+import com.yash.feedrunner.ui.theme.Radius
+import androidx.compose.foundation.BorderStroke
 
 /** Fixed geometry keeps the menu's position exact on first frame — no measure-then-jump. */
 private val MenuWidth = 168.dp
@@ -173,11 +176,14 @@ private fun ActionPill(
                 initialOffsetX = { full -> if (fromRight) full / 3 else -full / 3 },
             ),
     ) {
+        // These keep a shadow, unlike everything else. They genuinely float over
+        // another app with no surface of ours behind them, so a hairline alone
+        // would leave them sitting on X's feed with nothing to lift them off it.
         Surface(
-            shape = RoundedCornerShape(PillHeight / 2),
+            shape = RoundedCornerShape(Radius.control),
             color = MaterialTheme.colorScheme.surface,
-            tonalElevation = 3.dp,
-            shadowElevation = 5.dp,
+            border = BorderStroke(Space.hair, MaterialTheme.colorScheme.outlineVariant),
+            shadowElevation = 4.dp,
             modifier = Modifier
                 .fillMaxWidth()
                 .height(PillHeight)

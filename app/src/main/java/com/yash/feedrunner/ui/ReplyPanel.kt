@@ -12,6 +12,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.horizontalScroll
@@ -71,6 +72,11 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import com.yash.feedrunner.ui.theme.MetaTextStyle
+import com.yash.feedrunner.ui.theme.SoftAccentChip
+import com.yash.feedrunner.ui.theme.HairlineCard
+import com.yash.feedrunner.ui.theme.WashHeader
+import com.yash.feedrunner.ui.theme.Radius
+import com.yash.feedrunner.ui.theme.Space
 
 private val PanelShape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp)
 
@@ -111,7 +117,12 @@ fun ReplyPanel(
         Surface(
             shape = PanelShape,
             color = MaterialTheme.colorScheme.surface,
-            tonalElevation = 8.dp,
+            // Shadow, not tonal elevation. Tonal tints the surface with the accent,
+            // which on a white surface reads as a lavender cast over every draft.
+            // The sheet does genuinely float over another app, so it earns a shadow
+            // even though nothing inside it has one.
+            tonalElevation = 0.dp,
+            shadowElevation = 16.dp,
             modifier = Modifier
                 .fillMaxWidth()
                 .heightIn(max = 600.dp)
@@ -124,9 +135,14 @@ fun ReplyPanel(
             // from the platform.
             SelectionActionsHost {
               Box {
-              Column(modifier = Modifier.padding(16.dp)) {
-                PanelHeader(onDismiss = onDismiss)
+              Column {
+                // A band, not a field. The drafts below stay on plain surface: they
+                // are read over whatever X is showing and need all their contrast.
+                WashHeader {
+                    PanelHeader(onDismiss = onDismiss)
+                }
 
+                Column(modifier = Modifier.padding(Space.lg)) {
                 when (state) {
                     is PanelState.Loading -> LoadingBody()
                     is PanelState.Error -> ErrorBody(state.message, onRetry)
@@ -147,6 +163,7 @@ fun ReplyPanel(
                         },
                         onScrollState = { bodyScroll = it },
                     )
+                }
                 }
               }
 
@@ -179,16 +196,26 @@ fun ReplyPanel(
 @Composable
 private fun PanelHeader(onDismiss: () -> Unit) {
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = Space.lg, end = Space.sm, top = Space.md, bottom = Space.md),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
             text = "Feed Runner",
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold,
+            style = MaterialTheme.typography.headlineSmall,
+            color = MaterialTheme.colorScheme.onBackground,
             modifier = Modifier.weight(1f),
         )
-        TextButton(onClick = onDismiss) { Text("Close") }
+        Text(
+            text = "Close",
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier
+                .clip(RoundedCornerShape(Radius.chip))
+                .clickable(onClick = onDismiss)
+                .padding(horizontal = Space.md, vertical = Space.sm),
+        )
     }
 }
 
@@ -357,12 +384,12 @@ private fun StickyContextBar(context: PostContext, onTap: () -> Unit) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.surfaceColorAtElevation(8.dp))
+            .background(MaterialTheme.colorScheme.surface)
             .padding(bottom = 6.dp),
     ) {
     Surface(
         color = MaterialTheme.colorScheme.surface,
-        tonalElevation = 6.dp,
+        tonalElevation = 0.dp,
         shadowElevation = 3.dp,
         shape = RoundedCornerShape(12.dp),
         modifier = Modifier
@@ -589,13 +616,8 @@ private fun DraftCard(
     val haptics = LocalHapticFeedback.current
     // Per card, so opening the chips on one draft does not shuffle the others.
     var showRefinements by remember { mutableStateOf(false) }
-    Card(
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-        ),
-        modifier = Modifier.fillMaxWidth(),
-    ) {
-        Column(modifier = Modifier.padding(12.dp)) {
+    HairlineCard(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(Space.lg)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Pill(text = draft.angle.label, color = draft.angle.color)
                 if (draft.thought.isNotEmpty()) {
@@ -714,30 +736,25 @@ private fun UsedMarker(used: Boolean, onClick: () -> Unit) {
 
 @Composable
 private fun Pill(text: String, color: Color) {
-    Text(
-        text = text,
-        color = Color.White,
-        fontSize = 10.sp,
-        fontWeight = FontWeight.Bold,
-        modifier = Modifier
-            .clip(RoundedCornerShape(4.dp))
-            .background(color)
-            .padding(horizontal = 6.dp, vertical = 2.dp),
-    )
+    // A pale wash of the angle's own hue rather than a solid block of it. The hue
+    // is still doing the work of telling the takes apart, just at a volume that
+    // suits everything around it.
+    SoftAccentChip(text = text.lowercase(), hue = color)
 }
 
 @Composable
 private fun RefinementChip(label: String, enabled: Boolean, onClick: () -> Unit) {
     val alpha = if (enabled) 1f else 0.4f
+    val shape = RoundedCornerShape(Radius.chip)
     Text(
         text = label,
         style = MaterialTheme.typography.labelMedium,
         color = MaterialTheme.colorScheme.onSurface.copy(alpha = alpha),
         modifier = Modifier
-            .clip(RoundedCornerShape(14.dp))
-            .background(MaterialTheme.colorScheme.surface.copy(alpha = alpha))
+            .clip(shape)
+            .border(Space.hair, MaterialTheme.colorScheme.outlineVariant, shape)
             .clickable(enabled = enabled, onClick = onClick)
-            .padding(horizontal = 12.dp, vertical = 6.dp),
+            .padding(horizontal = Space.md, vertical = Space.sm),
     )
 }
 
