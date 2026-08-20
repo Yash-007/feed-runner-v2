@@ -77,6 +77,8 @@ import com.yash.feedrunner.ui.theme.HairlineCard
 import com.yash.feedrunner.ui.theme.WashHeader
 import com.yash.feedrunner.ui.theme.Radius
 import com.yash.feedrunner.ui.theme.Space
+import androidx.compose.foundation.layout.height
+import com.yash.feedrunner.ui.theme.VerticalHairline
 
 private val PanelShape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp)
 
@@ -542,13 +544,19 @@ private fun HistoryStrip(
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+        // A rail rather than a row of tiles: one bordered track, entries split by
+        // vertical hairlines, running off the right edge so it is obvious there is
+        // more without needing a scrollbar. Straight out of the reference.
+        val railShape = RoundedCornerShape(Radius.card)
         Row(
             modifier = Modifier
-                .padding(top = 6.dp)
+                .padding(top = Space.sm)
+                .clip(railShape)
+                .border(Space.hair, MaterialTheme.colorScheme.outlineVariant, railShape)
                 .horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            history.forEach { entry ->
+            history.forEachIndexed { index, entry ->
+                if (index > 0) VerticalHairline(height = RAIL_HEIGHT)
                 HistoryCard(
                     entry = entry,
                     selected = entry.savedAtMillis == selectedId,
@@ -562,19 +570,21 @@ private fun HistoryStrip(
 @Composable
 private fun HistoryCard(entry: HistoryEntry, selected: Boolean, onClick: () -> Unit) {
     val thumbnail = rememberDecoded(entry.thumbnailPath, MAX_PREVIEW_PIXELS)
+    // Inside the rail the entries have no border of their own, so the current one
+    // is marked by a tint rather than by an outline.
     val background = if (selected) {
-        MaterialTheme.colorScheme.primary.copy(alpha = 0.18f)
+        MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
     } else {
-        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+        Color.Transparent
     }
 
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
-            .clip(RoundedCornerShape(10.dp))
+            .height(RAIL_HEIGHT)
             .background(background)
             .clickable(enabled = !selected, onClick = onClick)
-            .padding(5.dp),
+            .padding(horizontal = Space.sm),
     ) {
         if (thumbnail != null) {
             Image(
@@ -757,6 +767,9 @@ private fun RefinementChip(label: String, enabled: Boolean, onClick: () -> Unit)
             .padding(horizontal = Space.md, vertical = Space.sm),
     )
 }
+
+/** Fixed so the dividing hairlines run the full height of the rail. */
+private val RAIL_HEIGHT = 52.dp
 
 /** Roughly the height of the history strip plus the post block. */
 private const val STICKY_HEADER_AFTER_PX = 220

@@ -50,23 +50,23 @@ art would look worse than none.
   [x] S1  Setup: serif "Feed Runner" on a wash header, readiness lines as one
           bordered card split by hairlines, voice rules as a bordered field,
           restyled buttons
-  [ ] S2  Ideas: serif "Ideas" on a wash header, streak card flat with a hairline,
+  [x] S2  Ideas: serif "Ideas" on a wash header, streak card flat with a hairline,
           filter chips squared off with hairline when unselected and solid violet
           when selected, seed cards bordered instead of filled, bottom bar flat
           with a top hairline
-  [ ] S3  Seed thread: seed headline in serif on a wash band, idea cards bordered,
+  [x] S3  Seed thread: seed headline in serif on a wash band, idea cards bordered,
           composer bordered, instruction bubbles keep the violet tint
 
 
 ## Overlay panels, where legibility over X comes first
 
-  [ ] S4  Reply sheet: a thin wash band behind the header only, body left plain.
+  [x] S4  Reply sheet: a thin wash band behind the header only, body left plain.
           Draft cards bordered, angle chips squared off
-  [ ] S5  Saved results strip becomes a rail: vertical hairlines between entries,
+  [x] S5  Saved results strip becomes a rail: vertical hairlines between entries,
           bleeding off the right edge
-  [ ] S6  Compose sheet: same treatment, and Post/Quote becomes a proper segmented
+  [x] S6  Compose sheet: same treatment, and Post/Quote becomes a proper segmented
           control like the toggle in the reference hero
-  [ ] S7  Bubble menu pills: flat, hairline, smaller radius, accent dots kept
+  [x] S7  Bubble menu pills: flat, hairline, smaller radius, accent dots kept
 
 
 ## Decisions
