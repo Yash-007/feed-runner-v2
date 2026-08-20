@@ -1,0 +1,79 @@
+# Feed Runner — visual redesign, fly.io inspired
+
+## What actually makes that site look the way it does
+
+Nine decisions, in rough order of how much each one carries:
+
+  1. Serif display headings, near black, large, tight tracking, paired with a
+     rounded geometric sans for body text in a muted purple grey. That pairing is
+     most of the identity.
+  2. Very light pastel gradient fields: mint into white into blush into lavender,
+     all desaturated, with a fine halftone dot texture over them.
+  3. Flat. No drop shadows anywhere in the content.
+  4. Separation by 1px hairline only. Cards are bordered rectangles, not filled
+     tiles.
+  5. One saturated accent, violet, used sparingly: the primary button and the
+     round nav buttons. Everything else is ink, grey, or pastel.
+  6. Big radius on the outer panel, small radius inside it.
+  7. Primary buttons are small radius rectangles, deliberately not pills. The
+     round buttons are for icons only, and the contrast between the two is on
+     purpose.
+  8. Horizontal rails that bleed off the right edge, so you can see there is more
+     without a scrollbar.
+  9. Generous whitespace, low density.
+
+We already share one thing with it: a violet accent. Everything else is ours to
+change.
+
+Not copying: the hand drawn illustrations. There is no artist, and generated
+art would look worse than none.
+
+
+## Foundation
+
+  [x] F1  Bundle a serif for display and a sans for body, build a Typography that
+          uses serif for display/headline and sans for everything else
+  [x] F2  Repaint the palette: ink text, muted purple grey secondary text, a real
+          hairline colour, violet kept as the single accent
+  [x] F3  A Wash composable: pastel gradient plus optional halftone dots, with a
+          dark mode counterpart, for header bands
+  [x] F4  One card style: hairline border, no fill, no elevation, generous padding.
+          Elevation survives only where something really floats, the sheet itself
+          and the selection toolbar
+  [x] F5  One button set: primary solid violet small radius, secondary tinted,
+          round icon button. Defined once, used everywhere
+  [x] F6  A spacing scale, applied instead of the current ad hoc numbers
+
+
+## Our own screens, where the design can go all in
+
+  [x] S1  Setup: serif "Feed Runner" on a wash header, readiness lines as one
+          bordered card split by hairlines, voice rules as a bordered field,
+          restyled buttons
+  [ ] S2  Ideas: serif "Ideas" on a wash header, streak card flat with a hairline,
+          filter chips squared off with hairline when unselected and solid violet
+          when selected, seed cards bordered instead of filled, bottom bar flat
+          with a top hairline
+  [ ] S3  Seed thread: seed headline in serif on a wash band, idea cards bordered,
+          composer bordered, instruction bubbles keep the violet tint
+
+
+## Overlay panels, where legibility over X comes first
+
+  [ ] S4  Reply sheet: a thin wash band behind the header only, body left plain.
+          Draft cards bordered, angle chips squared off
+  [ ] S5  Saved results strip becomes a rail: vertical hairlines between entries,
+          bleeding off the right edge
+  [ ] S6  Compose sheet: same treatment, and Post/Quote becomes a proper segmented
+          control like the toggle in the reference hero
+  [ ] S7  Bubble menu pills: flat, hairline, smaller radius, accent dots kept
+
+
+## Decisions
+
+  - Type: Fraunces for display, Figtree for body. Warm high contrast serif with a
+    soft axis, rounded geometric sans, the closest pair to the reference.
+  - Gradients: full on our own screens, a thin band behind overlay headers only.
+    Reply text sits over X and needs its contrast.
+  - Angle chips: pale fills with darker text of the same hue. The one place we do
+    not follow the single accent rule, because the colour is doing real work.

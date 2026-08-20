@@ -2,13 +2,11 @@ package com.yash.feedrunner.ui.theme
 
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 
 /**
@@ -32,15 +30,21 @@ private val LightScheme = lightColorScheme(
     onPrimaryContainer = Color(0xFF1F0C63),
     secondary = SkyBlue,
     onSecondary = Color.White,
-    background = Color(0xFFFBFAFF),
-    onBackground = Color(0xFF17131F),
-    surface = Color(0xFFFBFAFF),
-    onSurface = Color(0xFF17131F),
-    surfaceVariant = Color(0xFFEBE6F7),
-    onSurfaceVariant = Color(0xFF5B5570),
-    outline = Color(0xFF7C7590),
-    outlineVariant = Color(0xFFDCD5EC),
-    error = Color(0xFFBA1A1A),
+    background = Color(0xFFFCFBFE),
+    // Near black rather than soft grey: headings are meant to be the darkest thing
+    // on screen, with everything else stepping back from them.
+    onBackground = Color(0xFF14101B),
+    surface = Color(0xFFFFFFFF),
+    onSurface = Color(0xFF14101B),
+    surfaceVariant = Color(0xFFF3F0FA),
+    // Body text sits well back from the headings, and carries a little of the
+    // violet so the greys never read as dirty.
+    onSurfaceVariant = Color(0xFF5A5470),
+    outline = Color(0xFF9A93AE),
+    // The hairline. Almost the whole layout is built from this one colour, so it
+    // has to be visible on white and never assertive.
+    outlineVariant = Color(0xFFE4DEF0),
+    error = Color(0xFFB4232B),
     onError = Color.White,
 )
 
@@ -52,31 +56,17 @@ private val DarkScheme = darkColorScheme(
     onPrimaryContainer = Color(0xFFE7E0FF),
     secondary = Color(0xFF64C4FF),
     onSecondary = Color(0xFF00344F),
-    background = Color(0xFF0E0B14),
-    onBackground = Color(0xFFE8E4F2),
-    surface = Color(0xFF15111D),
-    onSurface = Color(0xFFE8E4F2),
-    surfaceVariant = Color(0xFF272132),
-    onSurfaceVariant = Color(0xFFB6AEC9),
+    background = Color(0xFF0D0A12),
+    onBackground = Color(0xFFF1EEF8),
+    surface = Color(0xFF141019),
+    onSurface = Color(0xFFF1EEF8),
+    surfaceVariant = Color(0xFF221C2E),
+    onSurfaceVariant = Color(0xFFAEA6C2),
     outline = Color(0xFF8B83A0),
-    outlineVariant = Color(0xFF3A3348),
+    outlineVariant = Color(0xFF322B41),
     error = Color(0xFFFFB4AB),
     onError = Color(0xFF690005),
 )
-
-/**
- * Slightly looser line height than the default on body styles: drafts are read at
- * a glance while holding the phone in one hand, and the stock 20sp on 14sp text
- * runs tight for multi-line replies.
- */
-private val AppTypography = Typography().let { base ->
-    base.copy(
-        bodyLarge = base.bodyLarge.copy(lineHeight = 25.sp),
-        bodyMedium = base.bodyMedium.copy(lineHeight = 21.sp),
-        labelLarge = base.labelLarge.copy(fontWeight = FontWeight.SemiBold),
-        titleMedium = base.titleMedium.copy(fontWeight = FontWeight.Bold),
-    )
-}
 
 /** Colours that carry meaning and so stay recognisable in both themes. */
 object Accent {
@@ -100,4 +90,8 @@ fun FeedRunnerTheme(
 }
 
 /** Text style helper for the small meta lines used across the panels. */
-internal val MetaTextStyle = TextStyle(fontSize = 10.sp, lineHeight = 13.sp)
+internal val MetaTextStyle = TextStyle(
+    fontFamily = Figtree,
+    fontSize = 10.sp,
+    lineHeight = 13.sp,
+)

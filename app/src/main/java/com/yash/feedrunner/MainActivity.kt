@@ -40,6 +40,21 @@ import com.yash.feedrunner.ui.ideas.IdeasActivity
 import com.yash.feedrunner.capture.CaptureService
 import com.yash.feedrunner.data.VoiceRulesStore
 import com.yash.feedrunner.ui.theme.FeedRunnerTheme
+import com.yash.feedrunner.ui.theme.WashHeader
+import com.yash.feedrunner.ui.theme.Space
+import com.yash.feedrunner.ui.theme.SecondaryButton
+import com.yash.feedrunner.ui.theme.Radius
+import com.yash.feedrunner.ui.theme.PrimaryButton
+import com.yash.feedrunner.ui.theme.HairlineCard
+import com.yash.feedrunner.ui.theme.Accent
+import androidx.compose.ui.draw.clip
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.background
+import com.yash.feedrunner.ui.theme.Hairline
+import androidx.compose.foundation.clickable
 
 class MainActivity : ComponentActivity() {
 
@@ -67,91 +82,158 @@ class MainActivity : ComponentActivity() {
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
-                        .verticalScroll(rememberScrollState())
-                        .padding(24.dp),
-                    verticalArrangement = Arrangement.spacedBy(14.dp),
+                        .verticalScroll(rememberScrollState()),
                 ) {
-                    Text("Feed Runner", style = MaterialTheme.typography.headlineMedium)
-
-                    SetupSection(
-                        hasOverlayPermission = hasOverlayPermission,
-                        captureServiceEnabled = captureServiceEnabled,
-                        apiKeyConfigured = apiKeyConfigured,
-                        onOpenOverlaySettings = ::openOverlaySettings,
-                        onOpenAccessibilitySettings = ::openAccessibilitySettings,
-                    )
-
-                    Spacer(Modifier.height(4.dp))
-
-                    Text("Extra voice rules (optional)", fontWeight = FontWeight.SemiBold)
-                    Text(
-                        "Your full voice is already built into the app. Use this only for " +
-                            "temporary tweaks — they are appended last and override the rest.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    OutlinedTextField(
-                        value = voiceRules,
-                        onValueChange = { voiceRules = it },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(130.dp),
-                        textStyle = MaterialTheme.typography.bodySmall,
-                    )
-                    OutlinedButton(
-                        onClick = {
-                            voiceRulesStore.rules = voiceRules
-                            Toast.makeText(this@MainActivity, "Extra rules saved", Toast.LENGTH_SHORT)
-                                .show()
-                        },
+                    // The one place the app raises its voice. Serif on a wash, and
+                    // then everything below it stays plain.
+                    WashHeader(
+                        modifier = Modifier.padding(bottom = Space.lg),
                     ) {
-                        Text("Save extra rules")
+                        Column(
+                            modifier = Modifier.padding(
+                                start = Space.xl,
+                                end = Space.xl,
+                                top = Space.xxl,
+                                bottom = Space.xl,
+                            ),
+                        ) {
+                            Text(
+                                text = "Feed Runner",
+                                style = MaterialTheme.typography.displaySmall,
+                                color = MaterialTheme.colorScheme.onBackground,
+                            )
+                            Text(
+                                text = "A reply and post copilot for X.",
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(top = Space.sm),
+                            )
+                        }
                     }
 
-                    Spacer(Modifier.height(4.dp))
-
-                    if (hasOverlayPermission && captureServiceEnabled) {
-                        val bubbleRunning = BubbleService.running.value
-                        Text(
-                            text = if (bubbleRunning) {
-                                "Bubble is running · open X and tap it"
-                            } else {
-                                "Bubble is off"
-                            },
-                            style = MaterialTheme.typography.bodySmall,
-                            color = if (bubbleRunning) {
-                                MaterialTheme.colorScheme.primary
-                            } else {
-                                MaterialTheme.colorScheme.onSurfaceVariant
-                            },
+                    Column(
+                        modifier = Modifier.padding(horizontal = Space.lg),
+                        verticalArrangement = Arrangement.spacedBy(Space.lg),
+                    ) {
+                        SetupSection(
+                            hasOverlayPermission = hasOverlayPermission,
+                            captureServiceEnabled = captureServiceEnabled,
+                            apiKeyConfigured = apiKeyConfigured,
+                            onOpenOverlaySettings = ::openOverlaySettings,
+                            onOpenAccessibilitySettings = ::openAccessibilitySettings,
                         )
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(10.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            // One button that does the thing that is currently
-                            // possible, so the state is never in question.
-                            Button(
-                                onClick = {
-                                    if (bubbleRunning) {
-                                        BubbleService.stop(this@MainActivity)
-                                    } else {
-                                        BubbleService.start(this@MainActivity)
-                                    }
-                                },
-                            ) {
-                                Text(if (bubbleRunning) "Stop bubble" else "Start bubble")
-                            }
-                            OutlinedButton(
-                                onClick = {
-                                    startActivity(
-                                        Intent(this@MainActivity, IdeasActivity::class.java),
-                                    )
-                                },
-                            ) {
-                                Text("Ideas")
+
+                        HairlineCard {
+                            Column(modifier = Modifier.padding(Space.lg)) {
+                                Text(
+                                    text = "Extra voice rules",
+                                    style = MaterialTheme.typography.titleMedium,
+                                )
+                                Text(
+                                    text = "Optional. Your full voice is already built in; " +
+                                        "these are appended last and override the rest.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(top = Space.xs),
+                                )
+                                OutlinedTextField(
+                                    value = voiceRules,
+                                    onValueChange = { voiceRules = it },
+                                    shape = RoundedCornerShape(Radius.control),
+                                    colors = OutlinedTextFieldDefaults.colors(
+                                        unfocusedBorderColor =
+                                            MaterialTheme.colorScheme.outlineVariant,
+                                    ),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(top = Space.md)
+                                        .height(140.dp),
+                                    textStyle = MaterialTheme.typography.bodySmall,
+                                )
+                                SecondaryButton(
+                                    label = "Save extra rules",
+                                    modifier = Modifier.padding(top = Space.md),
+                                    onClick = {
+                                        voiceRulesStore.rules = voiceRules
+                                        Toast.makeText(
+                                            this@MainActivity,
+                                            "Extra rules saved",
+                                            Toast.LENGTH_SHORT,
+                                        ).show()
+                                    },
+                                )
                             }
                         }
+
+                        if (hasOverlayPermission && captureServiceEnabled) {
+                            val bubbleRunning = BubbleService.running.value
+                            HairlineCard {
+                                Column(modifier = Modifier.padding(Space.lg)) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        // A dot rather than a sentence about state:
+                                        // the same language the Ideas screen uses for
+                                        // the server.
+                                        Box(
+                                            modifier = Modifier
+                                                .size(8.dp)
+                                                .clip(RoundedCornerShape(4.dp))
+                                                .background(
+                                                    if (bubbleRunning) {
+                                                        Accent.lastResult
+                                                    } else {
+                                                        MaterialTheme.colorScheme.outline
+                                                    },
+                                                ),
+                                        )
+                                        Text(
+                                            text = if (bubbleRunning) {
+                                                "Bubble is running · open X and tap it"
+                                            } else {
+                                                "Bubble is off"
+                                            },
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier.padding(start = Space.sm),
+                                        )
+                                    }
+                                    Row(
+                                        horizontalArrangement = Arrangement.spacedBy(Space.sm),
+                                        modifier = Modifier.padding(top = Space.md),
+                                    ) {
+                                        // One button that does the thing that is
+                                        // currently possible, so the state is never
+                                        // in question.
+                                        PrimaryButton(
+                                            label = if (bubbleRunning) {
+                                                "Stop bubble"
+                                            } else {
+                                                "Start bubble"
+                                            },
+                                            onClick = {
+                                                if (bubbleRunning) {
+                                                    BubbleService.stop(this@MainActivity)
+                                                } else {
+                                                    BubbleService.start(this@MainActivity)
+                                                }
+                                            },
+                                        )
+                                        SecondaryButton(
+                                            label = "Ideas",
+                                            onClick = {
+                                                startActivity(
+                                                    Intent(
+                                                        this@MainActivity,
+                                                        IdeasActivity::class.java,
+                                                    ),
+                                                )
+                                            },
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        Spacer(Modifier.height(Space.xl))
                     }
                 }
                 }
@@ -209,28 +291,76 @@ private fun SetupSection(
     onOpenOverlaySettings: () -> Unit,
     onOpenAccessibilitySettings: () -> Unit,
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        if (hasOverlayPermission) {
-            Text("Overlay permission granted ✓")
-        } else {
-            Text("Step 1: allow drawing over other apps")
-            Button(onClick = onOpenOverlaySettings) { Text("Grant overlay permission") }
-        }
+    HairlineCard {
+        ReadyRow(
+            done = hasOverlayPermission,
+            doneLabel = "Overlay permission granted",
+            todoLabel = "Allow drawing over other apps",
+            action = "Grant",
+            onAction = onOpenOverlaySettings,
+        )
+        Hairline()
+        ReadyRow(
+            done = captureServiceEnabled,
+            doneLabel = "Capture service enabled",
+            todoLabel = "Enable the capture service under Accessibility",
+            action = "Open settings",
+            onAction = onOpenAccessibilitySettings,
+        )
+        Hairline()
+        ReadyRow(
+            done = apiKeyConfigured,
+            doneLabel = "API key configured",
+            todoLabel = "Add anthropic.apiKey to local.properties and rebuild",
+            action = null,
+            onAction = {},
+        )
+    }
+}
 
-        if (captureServiceEnabled) {
-            Text("Capture service enabled ✓")
-        } else {
-            Text("Step 2: enable the capture service under Accessibility")
-            Button(onClick = onOpenAccessibilitySettings) { Text("Open Accessibility settings") }
-        }
-
-        if (apiKeyConfigured) {
-            Text("API key configured ✓")
-        } else {
+/**
+ * One line of the readiness list. A tick when it is done, the thing to do and the
+ * button that does it when it is not, so the card is a checklist rather than three
+ * paragraphs of instructions.
+ */
+@androidx.compose.runtime.Composable
+private fun ReadyRow(
+    done: Boolean,
+    doneLabel: String,
+    todoLabel: String,
+    action: String?,
+    onAction: () -> Unit,
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.padding(horizontal = Space.lg, vertical = Space.md),
+    ) {
+        Text(
+            text = if (done) "✓" else "•",
+            style = MaterialTheme.typography.titleMedium,
+            color = if (done) Accent.lastResult else MaterialTheme.colorScheme.error,
+        )
+        Text(
+            text = if (done) doneLabel else todoLabel,
+            style = MaterialTheme.typography.bodyMedium,
+            color = if (done) {
+                MaterialTheme.colorScheme.onSurfaceVariant
+            } else {
+                MaterialTheme.colorScheme.onSurface
+            },
+            modifier = Modifier
+                .padding(start = Space.md)
+                .weight(1f),
+        )
+        if (!done && action != null) {
             Text(
-                "No API key — add anthropic.apiKey to local.properties and rebuild.",
-                color = MaterialTheme.colorScheme.error,
-                style = MaterialTheme.typography.bodySmall,
+                text = action,
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(Radius.chip))
+                    .clickable(onClick = onAction)
+                    .padding(horizontal = Space.sm, vertical = Space.xs),
             )
         }
     }
