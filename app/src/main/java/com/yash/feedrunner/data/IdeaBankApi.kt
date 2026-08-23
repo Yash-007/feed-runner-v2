@@ -1,6 +1,7 @@
 package com.yash.feedrunner.data
 
 import android.util.Log
+import com.yash.feedrunner.BuildConfig
 import com.yash.feedrunner.ui.ChatMessage
 import com.yash.feedrunner.ui.ChatRole
 import com.yash.feedrunner.ui.IdeaSeed
@@ -201,7 +202,10 @@ class IdeaBankApi(
             val preferred = config.lastWorking.takeIf { it.isNotEmpty() }
             if (preferred != null) add(preferred)
             add(base)
-            add(USB_TUNNEL)
+            // The cable only helps when the backend is a laptop. Pointed at a
+            // deployed host it is a guaranteed extra failure on every call that
+            // the real address has already failed.
+            if (!base.startsWith("https://")) add(USB_TUNNEL)
         }.distinct()
 
         var failure: IdeaBankException? = null
@@ -243,6 +247,15 @@ class IdeaBankApi(
             // Generous: an ideation request waits on the model.
             connection.readTimeout = READ_TIMEOUT_MS
             connection.setRequestProperty("Accept", "application/json")
+            // The deployed backend rejects everything but /healthz without this.
+            // Empty when the backend is a laptop with no token set, and sending
+            // an empty bearer would just be a header saying nothing.
+            if (BuildConfig.IDEA_BANK_TOKEN.isNotBlank()) {
+                connection.setRequestProperty(
+                    "Authorization",
+                    "Bearer ${BuildConfig.IDEA_BANK_TOKEN}",
+                )
+            }
 
             if (payload != null) {
                 connection.doOutput = true
@@ -256,8 +269,13 @@ class IdeaBankApi(
 
             val body = runCatching { JSONObject(text) }.getOrElse { JSONObject() }
             if (code !in 200..299) {
-                val message = body.optString("error").takeIf { it.isNotBlank() }
-                    ?: "Server returned $code"
+                // 401 is a mismatched token, which is a setting to fix rather than
+                // something to retry, so it says so instead of echoing "unauthorized".
+                val message = when {
+                    code == 401 -> "Backend rejected the token. Check ideaBank.token."
+                    else -> body.optString("error").takeIf { it.isNotBlank() }
+                        ?: "Server returned $code"
+                }
                 throw IdeaBankException(message, reachable = true)
             }
             body

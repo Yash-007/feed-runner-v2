@@ -28,6 +28,13 @@ android {
             "ANTHROPIC_API_KEY",
             "\"${localProperties.getProperty("anthropic.apiKey", "")}\"",
         )
+        // Shared secret for the Idea Bank. Empty is correct for a local backend
+        // running without API_TOKEN set.
+        buildConfigField(
+            "String",
+            "IDEA_BANK_TOKEN",
+            "\"${localProperties.getProperty("ideaBank.token", "")}\"",
+        )
     }
 
     buildTypes {
