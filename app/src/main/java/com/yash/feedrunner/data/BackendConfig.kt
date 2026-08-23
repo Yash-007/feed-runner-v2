@@ -5,21 +5,25 @@ import android.content.Context
 /**
  * Where the Idea Bank backend lives.
  *
- * Editable at runtime rather than baked in, because the server runs on a laptop
- * whose LAN address changes with the network. The server prints the address to
- * type in here on startup.
+ * Defaults to the deployed service, which is the answer almost always. It stays
+ * editable because the alternative is a laptop whose LAN address changes with the
+ * network, and pointing at one is how you work on the backend.
  */
 class BackendConfig(context: Context) {
 
     private val prefs = context.getSharedPreferences("backend", Context.MODE_PRIVATE)
 
-    /** Normalised base URL with no trailing slash, or empty when unset. */
+    /** Normalised base URL with no trailing slash. Never empty. */
     var baseUrl: String
-        get() = prefs.getString(KEY_BASE_URL, "").orEmpty()
+        get() = prefs.getString(KEY_BASE_URL, "").orEmpty().ifEmpty { DEFAULT_BASE_URL }
         set(value) {
-            prefs.edit().putString(KEY_BASE_URL, normalise(value)).apply()
+            // Clearing the field returns you to the deployed service rather than
+            // to a broken app with nowhere to talk to.
+            val normalised = normalise(value)
+            prefs.edit().putString(KEY_BASE_URL, normalised).apply()
         }
 
+    /** True since there is always a default. Kept so callers read as intended. */
     val isConfigured: Boolean get() = baseUrl.isNotEmpty()
 
     /**
@@ -47,6 +51,9 @@ class BackendConfig(context: Context) {
     }
 
     private companion object {
+        /** The deployed Idea Bank. Public URL, not a secret; the token is the secret. */
+        const val DEFAULT_BASE_URL = "https://feed-runner-backend.onrender.com"
+
         const val KEY_BASE_URL = "base_url"
         const val KEY_LAST_WORKING = "last_working"
     }
