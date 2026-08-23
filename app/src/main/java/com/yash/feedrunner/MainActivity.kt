@@ -72,7 +72,6 @@ class MainActivity : ComponentActivity() {
         }
 
         val voiceRulesStore = VoiceRulesStore(this)
-        val apiKeyConfigured = BuildConfig.ANTHROPIC_API_KEY.isNotBlank()
 
         setContent {
             FeedRunnerTheme {
@@ -118,7 +117,6 @@ class MainActivity : ComponentActivity() {
                         SetupSection(
                             hasOverlayPermission = hasOverlayPermission,
                             captureServiceEnabled = captureServiceEnabled,
-                            apiKeyConfigured = apiKeyConfigured,
                             onOpenOverlaySettings = ::openOverlaySettings,
                             onOpenAccessibilitySettings = ::openAccessibilitySettings,
                         )
@@ -287,7 +285,6 @@ class MainActivity : ComponentActivity() {
 private fun SetupSection(
     hasOverlayPermission: Boolean,
     captureServiceEnabled: Boolean,
-    apiKeyConfigured: Boolean,
     onOpenOverlaySettings: () -> Unit,
     onOpenAccessibilitySettings: () -> Unit,
 ) {
@@ -306,14 +303,6 @@ private fun SetupSection(
             todoLabel = "Enable the capture service under Accessibility",
             action = "Open settings",
             onAction = onOpenAccessibilitySettings,
-        )
-        Hairline()
-        ReadyRow(
-            done = apiKeyConfigured,
-            doneLabel = "API key configured",
-            todoLabel = "Add anthropic.apiKey to local.properties and rebuild",
-            action = null,
-            onAction = {},
         )
     }
 }

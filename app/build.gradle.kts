@@ -23,11 +23,6 @@ android {
         versionCode = 1
         versionName = "0.1"
 
-        buildConfigField(
-            "String",
-            "ANTHROPIC_API_KEY",
-            "\"${localProperties.getProperty("anthropic.apiKey", "")}\"",
-        )
         // Shared secret for the Idea Bank. Empty is correct for a local backend
         // running without API_TOKEN set.
         buildConfigField(
@@ -83,5 +78,4 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.8.7")
     implementation("androidx.savedstate:savedstate-ktx:1.2.1")
 
-    implementation("com.anthropic:anthropic-java:2.34.0")
 }

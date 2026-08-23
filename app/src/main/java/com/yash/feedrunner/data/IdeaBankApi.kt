@@ -50,6 +50,12 @@ class IdeaBankApi(
         body.optBoolean("ok")
     }.getOrDefault(false)
 
+    /**
+     * One drafting call. Exposed so [CopilotApi] can borrow this transport rather
+     * than repeat the address search, the token header and the timeouts.
+     */
+    fun copilot(path: String, payload: JSONObject): JSONObject = request("POST", path, payload)
+
     /** Returns the seed as stored, so the caller learns its remote id. */
     fun createSeed(entry: StoredSeed): StoredSeed {
         val body = request("POST", "/seeds", entry.toJson())

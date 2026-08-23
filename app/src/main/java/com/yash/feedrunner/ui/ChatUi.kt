@@ -54,6 +54,7 @@ import kotlinx.coroutines.delay
 import com.yash.feedrunner.ui.theme.RoundIconButton
 import com.yash.feedrunner.ui.theme.Space
 import com.yash.feedrunner.ui.theme.Radius
+import com.yash.feedrunner.ui.theme.SoftAccentChip
 
 /**
  * The follow-up conversation, shared by the reply sheet and the compose sheet.
@@ -334,17 +335,14 @@ private fun ChatBubble(
             .padding(vertical = 4.dp),
         horizontalAlignment = if (fromUser) Alignment.End else Alignment.Start,
     ) {
+        // Same soft treatment as the draft cards. This one was missed when the
+        // angle pills were toned down, so a batch of replies came back shouting
+        // in solid colour next to cards that no longer did.
         message.angle?.takeIf { !fromUser }?.let { angle ->
-            Text(
-                text = angle.label,
-                fontSize = 8.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color.White,
-                modifier = Modifier
-                    .padding(bottom = 3.dp)
-                    .clip(RoundedCornerShape(4.dp))
-                    .background(angle.color)
-                    .padding(horizontal = 5.dp, vertical = 1.dp),
+            SoftAccentChip(
+                text = angle.label.lowercase(),
+                hue = angle.color,
+                modifier = Modifier.padding(bottom = Space.xs),
             )
         }
 

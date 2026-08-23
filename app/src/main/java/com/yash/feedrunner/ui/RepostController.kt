@@ -14,8 +14,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import com.yash.feedrunner.BuildConfig
-import com.yash.feedrunner.api.ClaudeClient
 import com.yash.feedrunner.api.ClaudeException
+import com.yash.feedrunner.data.BackendConfig
+import com.yash.feedrunner.data.CopilotApi
+import com.yash.feedrunner.data.IdeaBankApi
 import com.yash.feedrunner.api.humanMessage
 import com.yash.feedrunner.api.ImagePrep
 import com.yash.feedrunner.data.DraftPick
@@ -48,9 +50,7 @@ class RepostController(
     private val ideaBank = IdeaBankRepository(context)
     private val captureDir = File(context.filesDir, "repost").apply { mkdirs() }
 
-    private val claude: ClaudeClient? by lazy {
-        BuildConfig.ANTHROPIC_API_KEY.takeIf { it.isNotBlank() }?.let { ClaudeClient(it) }
-    }
+    private val claude: CopilotApi by lazy { CopilotApi(IdeaBankApi(BackendConfig(context))) }
 
     private var state by mutableStateOf<RepostState>(RepostState.Composing)
     private var mode by mutableStateOf(RepostMode.POST)
@@ -149,12 +149,6 @@ class RepostController(
 
     private fun generate() {
         val client = claude
-        if (client == null) {
-            state = RepostState.Error(
-                "No API key. Add anthropic.apiKey to local.properties and rebuild.",
-            )
-            return
-        }
         val path = capturePath
         if (path == null) {
             state = RepostState.Error("Capture was lost. Try again.")
@@ -230,7 +224,7 @@ class RepostController(
      * both the send and the answer so nothing is lost either way.
      */
     private fun sendChat(message: String) {
-        val client = claude ?: return
+        val client = claude
         val ready = state as? RepostState.Ready ?: return
         if (message.isBlank()) return
 

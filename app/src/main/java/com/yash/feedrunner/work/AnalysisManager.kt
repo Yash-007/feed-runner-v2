@@ -6,7 +6,9 @@ import android.os.Handler
 import android.os.Looper
 import android.util.Log
 import com.yash.feedrunner.BuildConfig
-import com.yash.feedrunner.api.ClaudeClient
+import com.yash.feedrunner.data.BackendConfig
+import com.yash.feedrunner.data.CopilotApi
+import com.yash.feedrunner.data.IdeaBankApi
 import com.yash.feedrunner.api.humanMessage
 import com.yash.feedrunner.api.ImagePrep
 import com.yash.feedrunner.data.IdeaBankRepository
@@ -48,9 +50,9 @@ class AnalysisManager(
     private val running = AtomicInteger(0)
     private var nextJobId = 1L
 
-    private val claude: ClaudeClient? by lazy {
-        BuildConfig.ANTHROPIC_API_KEY.takeIf { it.isNotBlank() }?.let { ClaudeClient(it) }
-    }
+    // Drafting happens on the backend now, so there is no key here to be missing
+    // and nothing to degrade to.
+    private val claude: CopilotApi by lazy { CopilotApi(IdeaBankApi(BackendConfig(context))) }
 
     /** Called on the main thread whenever a job finishes. */
     var onUpdate: ((Update) -> Unit)? = null
@@ -70,18 +72,6 @@ class AnalysisManager(
         val jobId = nextJobId++
         val client = claude
 
-        if (client == null) {
-            screenshot.recycle()
-            handler.post {
-                onUpdate?.invoke(
-                    Update.Failed(
-                        jobId,
-                        "No API key. Add anthropic.apiKey to local.properties and rebuild.",
-                    ),
-                )
-            }
-            return jobId
-        }
 
         running.incrementAndGet()
         notifyCount()

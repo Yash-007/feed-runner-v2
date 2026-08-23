@@ -14,8 +14,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import com.yash.feedrunner.BuildConfig
-import com.yash.feedrunner.api.ClaudeClient
 import com.yash.feedrunner.api.ClaudeException
+import com.yash.feedrunner.data.BackendConfig
+import com.yash.feedrunner.data.CopilotApi
+import com.yash.feedrunner.data.IdeaBankApi
 import com.yash.feedrunner.api.humanMessage
 import com.yash.feedrunner.data.ReadState
 import com.yash.feedrunner.data.IdeaBankRepository
@@ -47,11 +49,7 @@ class PanelController(
     private val readState = ReadState(context)
     private val ideaBank = IdeaBankRepository(context)
 
-    private val claude: ClaudeClient? by lazy {
-        BuildConfig.ANTHROPIC_API_KEY
-            .takeIf { it.isNotBlank() }
-            ?.let { ClaudeClient(it) }
-    }
+    private val claude: CopilotApi by lazy { CopilotApi(IdeaBankApi(BackendConfig(context))) }
 
     private var state by mutableStateOf<PanelState>(PanelState.Loading)
 
@@ -192,7 +190,7 @@ class PanelController(
     }
 
     private fun refineDraft(draft: Draft, refinement: Refinement) {
-        val client = claude ?: return
+        val client = claude
         // Not named `context`: that would shadow the constructor's Context.
         val activeContext = postContext ?: return
         updateDraft(draft.id) { it.copy(refining = true) }
@@ -232,7 +230,7 @@ class PanelController(
 
     /** Sends a chat turn about the post on screen, and persists the exchange. */
     private fun sendChat(message: String) {
-        val client = claude ?: return
+        val client = claude
         val activeContext = postContext ?: return
         val ready = state as? PanelState.Ready ?: return
 
@@ -300,7 +298,7 @@ class PanelController(
      * tap would be the wrong trade.
      */
     private fun moreInAngle(angle: Angle) {
-        val client = claude ?: return
+        val client = claude
         val activeContext = postContext ?: return
         val ready = state as? PanelState.Ready ?: return
         if (ready.chatPending) return
