@@ -134,7 +134,11 @@ fun IdeasScreen(state: IdeasUiState, actions: IdeasActions) {
                     verticalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
                     items(state.visibleSeeds, key = { it.key }) { seed ->
-                        SeedCard(seed = seed, onOpen = { actions.onOpenSeed(seed) })
+                        SeedCard(
+                            seed = seed,
+                            onOpen = { actions.onOpenSeed(seed) },
+                            onDelete = { actions.onAskDelete(seed) },
+                        )
                     }
                 }
             }

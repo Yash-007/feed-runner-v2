@@ -58,7 +58,7 @@ import com.yash.feedrunner.ui.theme.HairlineCard
  * because a list of fully expanded seeds is unreadable at ten items.
  */
 @Composable
-internal fun SeedCard(seed: StoredSeed, onOpen: () -> Unit) {
+internal fun SeedCard(seed: StoredSeed, onOpen: () -> Unit, onDelete: () -> Unit) {
     HairlineCard(
         modifier = Modifier.fillMaxWidth(),
         onClick = if (seed.isPending) null else onOpen,
@@ -68,9 +68,24 @@ internal fun SeedCard(seed: StoredSeed, onOpen: () -> Unit) {
                 ChipRow(seed = seed, modifier = Modifier.weight(1f))
                 Text(
                     text = if (seed.isPending) "syncing" else relativeAge(seed.createdAtMillis),
-                    fontSize = 10.sp,
+                    style = MetaTextStyle,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+                // Deleting used to mean opening the seed and finding the overflow
+                // menu, which is a lot of taps for a bank you prune often. Its own
+                // target, so it never fires from a tap meant to open the thread.
+                if (!seed.isPending) {
+                    Text(
+                        text = "✕",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier
+                            .padding(start = Space.xs)
+                            .clip(RoundedCornerShape(Radius.chip))
+                            .clickable(onClick = onDelete)
+                            .padding(horizontal = Space.sm, vertical = Space.xs),
+                    )
+                }
             }
 
             // Selectable in the list too: a tension is often the thing you want to
