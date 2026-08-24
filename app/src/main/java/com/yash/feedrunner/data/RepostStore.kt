@@ -7,6 +7,7 @@ import com.yash.feedrunner.ui.ChatMessage
 import com.yash.feedrunner.ui.ChatRole
 import com.yash.feedrunner.ui.PostDraft
 import com.yash.feedrunner.ui.PostStyle
+import com.yash.feedrunner.ui.Platform
 import com.yash.feedrunner.ui.RepostMode
 import com.yash.feedrunner.ui.RepostResult
 import com.yash.feedrunner.ui.TextReading
@@ -56,6 +57,7 @@ class RepostStore(context: Context) {
 
     private fun RepostResult.toJson() = JSONObject().apply {
         put("savedAt", savedAtMillis)
+        put("platform", platform.wire)
         put("mode", mode.name)
         put("reading", reading.name)
         put("capturePath", capturePath ?: JSONObject.NULL)
@@ -105,6 +107,7 @@ class RepostStore(context: Context) {
 
         val captureJson = getJSONObject("capture")
         RepostResult(
+            platform = Platform.fromWire(optString("platform")),
             mode = RepostMode.valueOf(getString("mode")),
             capture = CaptureContext(
                 contentType = captureJson.optString("contentType"),

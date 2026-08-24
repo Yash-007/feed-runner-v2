@@ -37,6 +37,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.yash.feedrunner.ui.SEED_QUICK_PROMPTS
+import com.yash.feedrunner.ui.Platform
 import com.yash.feedrunner.ui.SeedStatus
 import com.yash.feedrunner.ui.StoredSeed
 import com.yash.feedrunner.ui.relativeAge
@@ -143,6 +144,14 @@ private fun ChipRow(seed: StoredSeed, modifier: Modifier = Modifier) {
         horizontalArrangement = Arrangement.spacedBy(5.dp),
         modifier = modifier.horizontalScroll(rememberScrollState()),
     ) {
+        // X is the historical default, so only the marked case gets a chip.
+        if (seed.platform == Platform.LINKEDIN) {
+            Chip(
+                text = seed.platform.label,
+                container = seed.platform.hue.copy(alpha = 0.16f),
+                content = seed.platform.hue,
+            )
+        }
         Chip(
             text = seed.source.label,
             container = MaterialTheme.colorScheme.primaryContainer,

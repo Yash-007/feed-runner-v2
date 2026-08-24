@@ -1,0 +1,89 @@
+# LinkedIn support
+
+One app, two platforms. Same bubble, same capture, same drafting flows; what
+changes is the prompt behind them, the vocabulary on screen, and a platform
+stamp on everything that gets stored.
+
+Design decisions, made up front:
+
+  - Same tool schema and angle/style taxonomy on both platforms. ADD, PUSH_BACK,
+    BANTER etc. mean sensible things on LinkedIn too; the prompt reinterprets
+    them. This keeps parsing, storage and UI shared instead of forked.
+  - Platform is detected from the app under the bubble (the accessibility
+    service already receives window-change events with the package name, no new
+    permission), with a manual toggle in the bubble menu as override. The last
+    choice is remembered as the fallback for apps that are neither.
+  - LinkedIn prompts are written for a generic professional user, not for Yash.
+    The X prompts are not touched. Voice comes from the extra-voice-rules field.
+  - Existing stored data has no platform stamp; missing means X everywhere, so
+    nothing migrates.
+
+## Backend
+
+  [x] B1  prompts/linkedin_reply.md — comment copilot, generic user, LinkedIn
+          norms: professional but human, no engagement-bait, no hashtag spam,
+          no "Great post!", concrete over vague, honest disagreement allowed
+  [x] B2  prompts/linkedin_post.md — post/repost copilot, generic user: hook
+          first line, short paragraphs, story and take formats, 0-3 hashtags,
+          no LinkedIn cliches (agree?, thoughts?, "I'm humbled")
+  [x] B3  config: LINKEDIN_REPLY_PROMPT_FILE, LINKEDIN_POST_PROMPT_FILE
+  [x] B4  llm: prompt picked by platform; tool schemas parameterized so the
+          LinkedIn descriptions are generic while X's stay byte-identical
+          (protects X's warm prompt cache); instruction strings say
+          "LinkedIn post" when the platform is linkedin
+  [x] B5  all six /copilot routes accept platform (x|linkedin, default x)
+  [x] B6  seeds carry platform end to end: model field, stored in mongo,
+          returned in listings, included in the ideation dump
+  [x] B7  build + vet clean, push
+
+## App: data plumbing
+
+  [x] A1  Platform enum (wire, label, brand hue) + persisted last choice
+  [x] A2  CaptureService tracks the foreground package from the window events
+          it already receives
+  [x] A3  BubbleService: platform = detected app, else remembered choice;
+          passed into analyze and repost
+  [x] A4  CopilotApi: platform on all six calls
+  [x] A5  ResultStore/StoredResult: platform per result, missing = x, so
+          refine/angle/chat on a reopened result use the right prompt
+  [x] A6  RepostStore/RepostResult: same
+  [x] A7  Seeds: StoredSeed.platform, sent on upload, parsed on download
+
+## App: UI / UX
+
+  [x] U1  Bubble menu: platform toggle, X | in, preset by detection, one tap
+          to override before capturing. Small, top of the menu, brand hues
+  [x] U2  Reply panel: platform chip next to the author so you always know
+          which voice drafted these
+  [x] U3  Compose sheet: same chip; mode toggle reads Post | Repost on
+          LinkedIn (their term), Post | Quote on X
+  [x] U4  Ideas: platform chip on seed cards; platform filter row appears
+          only once the bank actually contains both platforms
+  [x] U5  Setup screen subtitle mentions both platforms
+  [x] U6  Everything themed: LinkedIn blue #0A66C2 as its accent chip hue,
+          X keeps ink. Soft chips, consistent with the design system
+
+## Testing
+
+  [x] T1  Backend: curl each new path with platform=linkedin — comment
+          drafting against a rendered LinkedIn-style capture, post drafting,
+          chat; confirm tone is LinkedIn and X routes are unchanged
+  [x] T2  Prompt cache: linkedin and x cache separately, both read on reuse
+  [x] T3  App build; on device: toggle platform in menu, capture with
+          LinkedIn selected, badge shows, drafts read as comments
+          (LinkedIn app is not installed on the test device, so detection is
+          exercised with the manual toggle; package mapping is code-reviewed)
+  [x] T4  X flow regression: one capture, unchanged behaviour
+  [x] T5  Seeds: a LinkedIn capture banks a platform-stamped seed, chip and
+          filter show in Ideas
+  [x] T6  Commit in small pieces, push both repos
+
+
+
+
+
+
+some more additions from my side
+- pls change the purple color from the theme to some other color which looks good. which looks naturally good. purple makes it look too ai generated app.
+- also add the dark mode feature in the app.
+- after completion. try this on linkedin app on my device and see how its working and check if there's some changes need to be make like while capturing the screen, ui, ux or any other.

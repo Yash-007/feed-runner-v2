@@ -62,6 +62,9 @@ class PanelController(
     /** Context for the drafts currently on screen; reused by refinements. */
     private var postContext: PostContext? = null
 
+    /** Platform of the shown result, so refinements and chat use the right prompt. */
+    private var platform: Platform = Platform.X
+
     /** Which stored result is on screen, so refinements update the right one. */
     private var currentResultId: Long? = null
 
@@ -80,9 +83,9 @@ class PanelController(
      * Hands [screenshot] to the background runner and opens the panel on its
      * loading state. Dismissing the panel does not cancel the job.
      */
-    fun analyze(screenshot: Bitmap?) {
+    fun analyze(screenshot: Bitmap?, platform: Platform) {
         if (screenshot == null) return
-        val jobId = analysisManager.submit(screenshot)
+        val jobId = analysisManager.submit(screenshot, platform)
         openWindow()
         watchedJobId = jobId
         state = PanelState.Loading
@@ -97,8 +100,10 @@ class PanelController(
         watchedJobId = null
         readState.markViewed(stored.savedAtMillis)
         postContext = stored.postContext
+        platform = stored.platform
         currentResultId = stored.savedAtMillis
         state = PanelState.Ready(
+            platform = stored.platform,
             postContext = stored.postContext,
             drafts = stored.drafts,
             thumbnailPath = stored.thumbnailPath,
@@ -134,8 +139,10 @@ class PanelController(
     private fun showStored(target: StoredResult, all: List<StoredResult>) {
         readState.markViewed(target.savedAtMillis)
         postContext = target.postContext
+        platform = target.platform
         currentResultId = target.savedAtMillis
         state = PanelState.Ready(
+            platform = target.platform,
             postContext = target.postContext,
             drafts = target.drafts,
             source = ResultSource.Cached(target.savedAtMillis),
@@ -191,6 +198,7 @@ class PanelController(
 
     private fun refineDraft(draft: Draft, refinement: Refinement) {
         val client = claude
+        val requestPlatform = platform
         // Not named `context`: that would shadow the constructor's Context.
         val activeContext = postContext ?: return
         updateDraft(draft.id) { it.copy(refining = true) }
@@ -205,6 +213,7 @@ class PanelController(
                     refinement = refinement,
                     postContext = activeContext,
                     extraVoiceRules = voiceRules,
+                    platform = requestPlatform,
                 )
             }
 
@@ -231,6 +240,7 @@ class PanelController(
     /** Sends a chat turn about the post on screen, and persists the exchange. */
     private fun sendChat(message: String) {
         val client = claude
+        val requestPlatform = platform
         val activeContext = postContext ?: return
         val ready = state as? PanelState.Ready ?: return
 
@@ -256,6 +266,7 @@ class PanelController(
                     history = history,
                     userMessage = message,
                     extraVoiceRules = voiceRules,
+                    platform = requestPlatform,
                 )
             }
 
@@ -299,6 +310,7 @@ class PanelController(
      */
     private fun moreInAngle(angle: Angle) {
         val client = claude
+        val requestPlatform = platform
         val activeContext = postContext ?: return
         val ready = state as? PanelState.Ready ?: return
         if (ready.chatPending) return
@@ -318,7 +330,7 @@ class PanelController(
 
         worker.execute {
             val outcome = runCatching {
-                client.repliesInAngle(angle, activeContext, drafts, voiceRules)
+                client.repliesInAngle(angle, activeContext, drafts, voiceRules, requestPlatform)
             }
 
             handler.post {
@@ -412,6 +424,7 @@ class PanelController(
             val current = updated.first { it.id == draft.id }
             ideaBank.recordPick(
                 DraftPick(
+                    platform = platform,
                     clientPickId = pickId,
                     source = "reply",
                     variant = current.angle.name,

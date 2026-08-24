@@ -69,8 +69,10 @@ data class MenuAnchor(
 @Composable
 fun ActionMenu(
     anchor: MenuAnchor,
+    platform: Platform,
     lastResultAge: String?,
     repostDraftsAge: String?,
+    onPlatform: (Platform) -> Unit,
     onCapture: () -> Unit,
     onHold: () -> Unit,
     onRepost: () -> Unit,
@@ -106,6 +108,10 @@ fun ActionMenu(
                 .width(MenuWidth),
             verticalArrangement = Arrangement.spacedBy(PillGap),
         ) {
+            // Which network the drafts are for. Preset from the app under the
+            // bubble; one tap corrects it, and the choice is remembered.
+            PlatformToggle(platform = platform, onPlatform = onPlatform)
+
             ActionPill(
                 visible = visible,
                 index = 0,
@@ -147,6 +153,43 @@ fun ActionMenu(
                 enabled = lastResultAge != null,
                 onClick = onLastResult,
             )
+        }
+    }
+}
+
+@Composable
+private fun PlatformToggle(platform: Platform, onPlatform: (Platform) -> Unit) {
+    val shape = RoundedCornerShape(Radius.control)
+    Surface(
+        shape = shape,
+        color = MaterialTheme.colorScheme.surface,
+        border = BorderStroke(Space.hair, MaterialTheme.colorScheme.outlineVariant),
+        shadowElevation = 4.dp,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Row(modifier = Modifier.padding(Space.xs)) {
+            Platform.entries.forEach { option ->
+                val selected = option == platform
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier
+                        .weight(1f)
+                        .clip(RoundedCornerShape(Radius.chip))
+                        .background(if (selected) option.hue else Color.Transparent)
+                        .clickable(enabled = !selected) { onPlatform(option) }
+                        .padding(vertical = 6.dp),
+                ) {
+                    Text(
+                        text = option.label,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = if (selected) {
+                            Color.White
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        },
+                    )
+                }
+            }
         }
     }
 }

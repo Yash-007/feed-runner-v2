@@ -3,6 +3,7 @@ package com.yash.feedrunner.data
 import android.content.Context
 import android.util.Log
 import com.yash.feedrunner.ui.IdeaSeed
+import com.yash.feedrunner.ui.Platform
 import com.yash.feedrunner.ui.SeedSource
 import com.yash.feedrunner.ui.SeedStatus
 import com.yash.feedrunner.ui.StoredSeed
@@ -67,6 +68,7 @@ class SeedOutbox(context: Context) {
 internal fun StoredSeed.toJson(): JSONObject = JSONObject().apply {
     put("client_seed_id", clientSeedId)
     put("source", source.wire)
+    put("platform", platform.wire)
     put("theme_tags", JSONArray().apply { seed.themeTags.forEach { put(it) } })
     put("tension", seed.tension)
     put("angle_hint", seed.angleHint)
@@ -86,6 +88,7 @@ internal fun JSONObject.toStoredSeed(): StoredSeed? = runCatching {
         remoteId = optString("id").takeIf { it.isNotEmpty() && it != "null" },
         clientSeedId = optString("client_seed_id"),
         source = SeedSource.fromWire(optString("source")),
+        platform = Platform.fromWire(optString("platform")),
         status = SeedStatus.fromWire(optString("status")),
         seed = IdeaSeed(
             themeTags = tags,

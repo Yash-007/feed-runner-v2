@@ -54,6 +54,9 @@ class RepostController(
 
     private var state by mutableStateOf<RepostState>(RepostState.Composing)
     private var mode by mutableStateOf(RepostMode.POST)
+
+    /** Platform of the current capture; drives the prompt and the labels. */
+    private var platform by mutableStateOf(Platform.X)
     private var userText by mutableStateOf("")
     private var capturePath by mutableStateOf<String?>(null)
 
@@ -87,7 +90,8 @@ class RepostController(
     val heldResultAge: String? get() = heldResult?.let { relativeAge(it.savedAtMillis) }
 
     /** Opens the composer for a fresh capture, with the keyboard already up. */
-    fun start(screenshot: Bitmap) {
+    fun start(screenshot: Bitmap, platform: Platform) {
+        this.platform = platform
         capturePath = writeCapture(screenshot)
         screenshot.recycle()
         state = RepostState.Composing
@@ -99,6 +103,7 @@ class RepostController(
     fun showHeldResult() {
         val held = heldResult ?: return
         heldUnseen = false
+        platform = held.platform
         mode = held.mode
         capturePath = held.capturePath
         state = RepostState.Ready(held)
@@ -121,6 +126,7 @@ class RepostController(
         window.show(gravity = Gravity.BOTTOM) {
             FeedRunnerTheme {
                 RepostPanel(
+                    platform = platform,
                     state = state,
                     mode = mode,
                     capturePath = capturePath,
@@ -157,6 +163,7 @@ class RepostController(
 
         state = RepostState.Loading
         val requestedMode = mode
+        val requestPlatform = platform
         val text = userText.trim()
         val voiceRules = voiceRulesStore.rules
 
@@ -165,13 +172,14 @@ class RepostController(
                 val bitmap = decodeScaledForApi(path)
                     ?: throw ClaudeException("Could not read the capture. Try again.")
                 val segments = ImagePrep.toBase64Segments(bitmap)
-                client.suggestPosts(requestedMode, segments, text, voiceRules)
+                client.suggestPosts(requestedMode, segments, text, voiceRules, requestPlatform)
             }
 
             handler.post {
                 outcome
                     .onSuccess { analysis ->
                         val result = RepostResult(
+                            platform = requestPlatform,
                             mode = requestedMode,
                             capture = analysis.capture,
                             reading = analysis.reading,
@@ -191,6 +199,7 @@ class RepostController(
                             postAuthor = analysis.capture.quotedAuthor.orEmpty(),
                             postText = analysis.capture.summary,
                             capturedAtMillis = result.savedAtMillis,
+                            platform = requestPlatform,
                         )
                         heldResult = result
                         if (window.isShowing) {
@@ -241,6 +250,7 @@ class RepostController(
         worker.execute {
             val outcome = runCatching {
                 client.chatPosts(
+                    platform = result.platform,
                     mode = result.mode,
                     capture = result.capture,
                     drafts = result.drafts,
@@ -319,6 +329,7 @@ class RepostController(
             val current = updated.first { it.id == draft.id }
             ideaBank.recordPick(
                 DraftPick(
+                    platform = result.platform,
                     clientPickId = pickId,
                     source = result.mode.wire,
                     variant = current.style.name,

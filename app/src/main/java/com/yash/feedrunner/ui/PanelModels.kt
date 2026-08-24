@@ -123,6 +123,7 @@ data class ChatMessage(
 
 /** The most recent analysis, persisted so it can be reopened for free. */
 data class StoredResult(
+    val platform: Platform = Platform.X,
     val postContext: PostContext,
     val drafts: List<Draft>,
     val thumbnailPath: String?,
@@ -151,6 +152,7 @@ sealed interface PanelState {
     data object Loading : PanelState
 
     data class Ready(
+        val platform: Platform = Platform.X,
         val postContext: PostContext,
         val drafts: List<Draft>,
         val source: ResultSource = ResultSource.Fresh,

@@ -83,6 +83,7 @@ private val SheetShape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp)
  */
 @Composable
 fun RepostPanel(
+    platform: Platform,
     state: RepostState,
     mode: RepostMode,
     capturePath: String?,
@@ -181,8 +182,13 @@ fun RepostPanel(
                                 text = "Compose",
                                 style = MaterialTheme.typography.headlineSmall,
                                 color = MaterialTheme.colorScheme.onBackground,
-                                modifier = Modifier.weight(1f),
                             )
+                            SoftAccentChip(
+                                text = platform.label,
+                                hue = platform.hue,
+                                modifier = Modifier.padding(start = Space.sm),
+                            )
+                            Box(modifier = Modifier.weight(1f))
                             Text(
                                 text = "Close",
                                 style = MaterialTheme.typography.labelLarge,
@@ -205,6 +211,7 @@ fun RepostPanel(
                     // It collapses to a brief you can reopen to change and rerun.
                     if (ready == null || editing) {
                         ModeToggle(
+                            platform = platform,
                             mode = mode,
                             enabled = state !is RepostState.Loading,
                             onModeChange = onModeChange,
@@ -356,10 +363,15 @@ private fun PostUsedMarker(used: Boolean, onClick: () -> Unit) {
 /** Post vs Quote. The single most consequential choice here, so it leads. */
 @Composable
 private fun ModeToggle(
+    platform: Platform,
     mode: RepostMode,
     enabled: Boolean,
     onModeChange: (RepostMode) -> Unit,
 ) {
+    // LinkedIn calls a quote a repost with your thoughts, so the toggle should too.
+    fun label(option: RepostMode): String =
+        if (platform == Platform.LINKEDIN && option == RepostMode.QUOTE) "Repost" else option.label
+
     // A track drawn with a hairline, and the chosen half filled with the accent.
     // The old version tinted the whole track and lifted the selection with a
     // lighter fill, which relies on shadow and elevation this design does not use.
@@ -390,7 +402,7 @@ private fun ModeToggle(
                     .padding(vertical = Space.sm),
             ) {
                 Text(
-                    text = option.label,
+                    text = label(option),
                     style = MaterialTheme.typography.labelLarge,
                     color = if (selected) {
                         MaterialTheme.colorScheme.onPrimary
@@ -404,7 +416,11 @@ private fun ModeToggle(
     Text(
         text = when (mode) {
             RepostMode.POST -> "Original post. The capture goes with it as the image."
-            RepostMode.QUOTE -> "Your line sits above the quoted post."
+            RepostMode.QUOTE -> if (platform == Platform.LINKEDIN) {
+                "Your line sits above the reposted post."
+            } else {
+                "Your line sits above the quoted post."
+            }
         },
         style = MaterialTheme.typography.labelSmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant,

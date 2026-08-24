@@ -19,7 +19,16 @@ class CaptureService : AccessibilityService() {
         instance = this
     }
 
-    override fun onAccessibilityEvent(event: AccessibilityEvent?) = Unit
+    /**
+     * The service already receives window-state events; the package name on them
+     * is how the bubble knows whether it is floating over X or LinkedIn. Our own
+     * overlays are ignored so opening a panel does not clobber the answer.
+     */
+    override fun onAccessibilityEvent(event: AccessibilityEvent?) {
+        val pkg = event?.packageName?.toString() ?: return
+        if (pkg == packageName) return
+        lastForegroundPackage = pkg
+    }
 
     override fun onInterrupt() = Unit
 
@@ -90,6 +99,10 @@ class CaptureService : AccessibilityService() {
     }
 
     companion object {
+        /** Package of the app most recently in the foreground. */
+        @Volatile
+        var lastForegroundPackage: String? = null
+
         private const val SCROLL_DURATION_MS = 700L
 
         @Volatile

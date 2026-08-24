@@ -26,6 +26,8 @@ import com.yash.feedrunner.capture.AutoScrollCapture
 import com.yash.feedrunner.capture.CaptureService
 import com.yash.feedrunner.data.ReadState
 import com.yash.feedrunner.data.IdeaBankRepository
+import com.yash.feedrunner.data.PlatformStore
+import com.yash.feedrunner.ui.Platform
 import com.yash.feedrunner.data.ResultStore
 import com.yash.feedrunner.ui.MenuAnchor
 import com.yash.feedrunner.ui.MenuController
@@ -83,6 +85,10 @@ class BubbleService : Service() {
     private lateinit var panelController: PanelController
     private lateinit var repostController: RepostController
     private lateinit var menuController: MenuController
+    private lateinit var platformStore: PlatformStore
+
+    /** Platform under Hold's stitched capture, chosen when the Hold started. */
+    private var holdPlatform = Platform.X
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -115,6 +121,7 @@ class BubbleService : Service() {
             composerUp = visible
             applyBubbleVisibility()
         }
+        platformStore = PlatformStore(this)
         menuController = MenuController(
             context = this,
             windowManager = windowManager,
@@ -126,6 +133,7 @@ class BubbleService : Service() {
                 repostController.hasUnseenResult
             } },
             onLastResult = { panelController.showLastResult() },
+            onPlatformChosen = { platformStore.last = it },
         )
         startForeground(NOTIFICATION_ID, buildNotification())
         addBubble()
@@ -300,7 +308,7 @@ class BubbleService : Service() {
         val bubbleSize = bubbleView?.width?.takeIf { it > 0 } ?: dp(BUBBLE_WINDOW_DP)
         val screenWidth = resources.displayMetrics.widthPixels
         menuController.show(
-            MenuAnchor(
+            anchor = MenuAnchor(
                 bubbleX = params.x,
                 bubbleY = params.y,
                 bubbleSize = bubbleSize,
@@ -308,13 +316,23 @@ class BubbleService : Service() {
                 screenWidth = screenWidth,
                 screenHeight = resources.displayMetrics.heightPixels,
             ),
+            initialPlatform = currentPlatform(),
         )
     }
 
-    private fun startSingleCapture() {
+    /**
+     * The platform under the bubble right now: the foreground app when it is X
+     * or LinkedIn, otherwise whatever was chosen or used last. The menu shows
+     * this and lets one tap override it.
+     */
+    private fun currentPlatform(): Platform =
+        Platform.fromPackage(CaptureService.lastForegroundPackage) ?: platformStore.last
+
+    private fun startSingleCapture(platform: Platform) {
+        platformStore.last = platform
         takeScreenshotThen { bitmap ->
             // PanelController owns the bitmap from here (thumbnail, then recycle).
-            panelController.analyze(bitmap)
+            panelController.analyze(bitmap, platform)
         }
     }
 
@@ -323,7 +341,8 @@ class BubbleService : Service() {
      * closed, that result is shown instead of taking a new capture, so the work
      * is never stranded.
      */
-    private fun startRepostCapture() {
+    private fun startRepostCapture(platform: Platform) {
+        platformStore.last = platform
         // Only an unseen hand-off pre-empts a capture. Older drafts are offered
         // inside the composer instead, so Repost always means "caption what I am
         // looking at now".
@@ -331,10 +350,12 @@ class BubbleService : Service() {
             repostController.showHeldResult()
             return
         }
-        takeScreenshotThen { bitmap -> repostController.start(bitmap) }
+        takeScreenshotThen { bitmap -> repostController.start(bitmap, platform) }
     }
 
-    private fun startAutoCapture() {
+    private fun startAutoCapture(platform: Platform) {
+        platformStore.last = platform
+        holdPlatform = platform
         val captureService = CaptureService.instance
         if (captureService == null) {
             promptEnableCaptureService()
@@ -367,7 +388,7 @@ class BubbleService : Service() {
                 } else {
                     // Milestone 3: slice the stitched image into readable segments
                     // before sending — very tall images get downscaled by the API.
-                    panelController.analyze(stitched)
+                    panelController.analyze(stitched, holdPlatform)
                 }
             },
         ).also { it.start() }

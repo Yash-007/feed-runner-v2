@@ -1,6 +1,7 @@
 package com.yash.feedrunner.data
 
 import android.content.Context
+import com.yash.feedrunner.ui.Platform
 import android.util.Log
 import org.json.JSONArray
 import org.json.JSONObject
@@ -12,6 +13,8 @@ data class DraftPick(
     val clientPickId: String,
     /** reply, post or quote. */
     val source: String,
+    /** x or linkedin, stamped so the bank can tell the networks apart. */
+    val platform: Platform = Platform.X,
     /** The ANGLE for a reply, the STYLE for a post or quote. */
     val variant: String,
     val thought: String,
@@ -84,6 +87,7 @@ class PickOutbox(context: Context) {
         put("delete", isDelete)
         pick?.let {
             put("source", it.source)
+            put("platform", it.platform.wire)
             put("variant", it.variant)
             put("thought", it.thought)
             put("text", it.text)
@@ -103,6 +107,7 @@ class PickOutbox(context: Context) {
                 pick = DraftPick(
                     clientPickId = id,
                     source = optString("source"),
+                platform = Platform.fromWire(optString("platform")),
                     variant = optString("variant"),
                     thought = optString("thought"),
                     text = optString("text"),

@@ -53,6 +53,7 @@ enum class SeedStatus(val wire: String, val label: String, val color: Color) {
  */
 data class StoredSeed(
     val remoteId: String?,
+    val platform: Platform = Platform.X,
     val clientSeedId: String,
     val source: SeedSource,
     val status: SeedStatus,

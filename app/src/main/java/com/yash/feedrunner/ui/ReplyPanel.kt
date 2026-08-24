@@ -141,7 +141,10 @@ fun ReplyPanel(
                 // A band, not a field. The drafts below stay on plain surface: they
                 // are read over whatever X is showing and need all their contrast.
                 WashHeader {
-                    PanelHeader(onDismiss = onDismiss)
+                    PanelHeader(
+                        platform = (state as? PanelState.Ready)?.platform,
+                        onDismiss = onDismiss,
+                    )
                 }
 
                 Column(modifier = Modifier.padding(Space.lg)) {
@@ -196,7 +199,7 @@ fun ReplyPanel(
 }
 
 @Composable
-private fun PanelHeader(onDismiss: () -> Unit) {
+private fun PanelHeader(platform: Platform?, onDismiss: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -207,8 +210,16 @@ private fun PanelHeader(onDismiss: () -> Unit) {
             text = "Feed Runner",
             style = MaterialTheme.typography.headlineSmall,
             color = MaterialTheme.colorScheme.onBackground,
-            modifier = Modifier.weight(1f),
         )
+        // Which network's voice drafted what is below. Absent while loading.
+        platform?.let {
+            SoftAccentChip(
+                text = it.label,
+                hue = it.hue,
+                modifier = Modifier.padding(start = Space.sm),
+            )
+        }
+        Box(modifier = Modifier.weight(1f))
         Text(
             text = "Close",
             style = MaterialTheme.typography.labelLarge,

@@ -16,6 +16,7 @@ import androidx.compose.ui.Modifier
 import androidx.lifecycle.lifecycleScope
 import com.yash.feedrunner.bubble.BubbleService
 import com.yash.feedrunner.data.IdeaBankRepository
+import com.yash.feedrunner.ui.Platform
 import com.yash.feedrunner.ui.SeedStatus
 import com.yash.feedrunner.ui.StoredSeed
 import com.yash.feedrunner.ui.Streak
@@ -36,6 +37,8 @@ data class IdeasUiState(
     val filter: SeedStatus? = null,
     /** Theme tag to narrow by, applied on top of the status filter. */
     val tagFilter: String? = null,
+    /** Platform filter. Only offered once the bank holds both platforms. */
+    val platformFilter: Platform? = null,
     val loading: Boolean = false,
     val generating: Boolean = false,
     val message: String? = null,
@@ -64,9 +67,19 @@ data class IdeasUiState(
             .map { it.key }
             .take(MAX_TAG_CHIPS)
 
-    /** The status filter is applied server-side; the tag filter is local. */
+    /** True once seeds from both networks exist, which is when a filter earns a row. */
+    val hasBothPlatforms: Boolean
+        get() = seeds.any { it.platform == Platform.LINKEDIN } &&
+            seeds.any { it.platform == Platform.X }
+
+    /** The status filter is applied server-side; tag and platform are local. */
     val visibleSeeds: List<StoredSeed>
-        get() = tagFilter?.let { tag -> seeds.filter { tag in it.seed.themeTags } } ?: seeds
+        get() {
+            var visible = seeds
+            platformFilter?.let { p -> visible = visible.filter { it.platform == p } }
+            tagFilter?.let { tag -> visible = visible.filter { tag in it.seed.themeTags } }
+            return visible
+        }
 
     /** The seed being worked on, if its thread is open. */
     val openSeed: StoredSeed? get() = seeds.firstOrNull { it.key == openSeedKey }
@@ -77,6 +90,7 @@ data class IdeasActions(
     val onRefresh: () -> Unit,
     val onFilterChange: (SeedStatus?) -> Unit,
     val onTagFilterChange: (String?) -> Unit,
+    val onPlatformFilterChange: (Platform?) -> Unit,
     val onClearFilters: () -> Unit,
     val onOpenSeed: (StoredSeed) -> Unit,
     val onSetStatus: (StoredSeed, SeedStatus) -> Unit,
@@ -139,8 +153,11 @@ class IdeasActivity : ComponentActivity() {
                                 onRefresh = ::refresh,
                                 onFilterChange = ::changeFilter,
                                 onTagFilterChange = { state = state.copy(tagFilter = it) },
+                                onPlatformFilterChange = {
+                                    state = state.copy(platformFilter = it)
+                                },
                                 onClearFilters = {
-                                    state = state.copy(tagFilter = null)
+                                    state = state.copy(tagFilter = null, platformFilter = null)
                                     changeFilter(null)
                                 },
                                 onOpenSeed = ::openSeed,

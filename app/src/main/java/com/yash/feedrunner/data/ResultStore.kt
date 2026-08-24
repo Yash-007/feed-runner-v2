@@ -7,6 +7,7 @@ import com.yash.feedrunner.ui.Angle
 import com.yash.feedrunner.ui.ChatMessage
 import com.yash.feedrunner.ui.ChatRole
 import com.yash.feedrunner.ui.Draft
+import com.yash.feedrunner.ui.Platform
 import com.yash.feedrunner.ui.PostContext
 import com.yash.feedrunner.ui.StoredResult
 import org.json.JSONArray
@@ -40,7 +41,12 @@ class ResultStore(private val context: Context) {
     data class Saved(val id: Long, val thumbnailPath: String?, val capturePath: String?)
 
     /** Prepends a new result and prunes to [MAX_RESULTS]. */
-    fun save(postContext: PostContext, drafts: List<Draft>, screenshot: Bitmap?): Saved {
+    fun save(
+        postContext: PostContext,
+        drafts: List<Draft>,
+        screenshot: Bitmap?,
+        platform: Platform,
+    ): Saved {
         synchronized(lock) {
         val savedAt = nextId()
         val thumbnailPath = screenshot?.let { writeThumbnail(it, savedAt) }
@@ -48,6 +54,7 @@ class ResultStore(private val context: Context) {
 
         val entry = JSONObject().apply {
             put("savedAt", savedAt)
+            put("platform", platform.wire)
             put("thumbnailPath", thumbnailPath ?: JSONObject.NULL)
             put("capturePath", capturePath ?: JSONObject.NULL)
             put("postContext", postContext.toJson())
@@ -138,6 +145,7 @@ class ResultStore(private val context: Context) {
         if (drafts.isEmpty()) return@runCatching null
 
         StoredResult(
+            platform = Platform.fromWire(optString("platform")),
             postContext = getJSONObject("postContext").toPostContext(),
             drafts = drafts,
             thumbnailPath = existingPath("thumbnailPath"),

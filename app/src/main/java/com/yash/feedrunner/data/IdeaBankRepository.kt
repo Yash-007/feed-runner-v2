@@ -4,6 +4,7 @@ import android.content.Context
 import android.util.Log
 import com.yash.feedrunner.ui.IdeaSeed
 import com.yash.feedrunner.ui.PostIdea
+import com.yash.feedrunner.ui.Platform
 import com.yash.feedrunner.ui.SeedSource
 import com.yash.feedrunner.ui.SeedStatus
 import com.yash.feedrunner.ui.StoredSeed
@@ -48,11 +49,13 @@ class IdeaBankRepository(context: Context) {
         postAuthor: String = "",
         postText: String = "",
         capturedAtMillis: Long = System.currentTimeMillis(),
+        platform: Platform = Platform.X,
     ) {
         if (seed == null || seed.isEmpty) return
 
         val entry = StoredSeed(
             remoteId = null,
+            platform = platform,
             clientSeedId = clientSeedId,
             source = source,
             status = SeedStatus.NEW,

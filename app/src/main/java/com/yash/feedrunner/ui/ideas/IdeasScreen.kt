@@ -54,6 +54,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.yash.feedrunner.ui.PostIdea
 import com.yash.feedrunner.ui.StoredSeed
+import com.yash.feedrunner.ui.Platform
 import com.yash.feedrunner.ui.SeedStatus
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.ImeAction
@@ -107,8 +108,11 @@ fun IdeasScreen(state: IdeasUiState, actions: IdeasActions) {
             status = state.filter,
             tag = state.tagFilter,
             tags = state.availableTags,
+            platform = state.platformFilter,
+            showPlatforms = state.hasBothPlatforms,
             onStatus = actions.onFilterChange,
             onTag = actions.onTagFilterChange,
+            onPlatform = actions.onPlatformFilterChange,
         )
 
         state.message?.let { message ->
@@ -244,10 +248,39 @@ private fun FilterBar(
     status: SeedStatus?,
     tag: String?,
     tags: List<String>,
+    platform: Platform?,
+    showPlatforms: Boolean,
     onStatus: (SeedStatus?) -> Unit,
     onTag: (String?) -> Unit,
+    onPlatform: (Platform?) -> Unit,
 ) {
     Column {
+        // Hidden until the bank holds seeds from both networks; a filter with
+        // one possible answer is noise.
+        if (showPlatforms) {
+            Row(
+                modifier = Modifier
+                    .padding(start = 16.dp, end = 16.dp, top = 10.dp)
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(7.dp),
+            ) {
+                Platform.entries.forEach { entry ->
+                    val active = platform == entry
+                    Text(
+                        text = entry.label,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = if (active) Color.White else entry.hue,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(Radius.chip))
+                            .background(
+                                if (active) entry.hue else entry.hue.copy(alpha = 0.12f),
+                            )
+                            .clickable { onPlatform(if (active) null else entry) }
+                            .padding(horizontal = Space.md, vertical = Space.sm),
+                    )
+                }
+            }
+        }
         Row(
             modifier = Modifier
                 .padding(horizontal = 16.dp, vertical = 10.dp)

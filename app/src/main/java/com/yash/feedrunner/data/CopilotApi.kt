@@ -1,6 +1,8 @@
 package com.yash.feedrunner.data
 
+import android.util.Log
 import com.yash.feedrunner.ui.Angle
+import com.yash.feedrunner.ui.Platform
 import com.yash.feedrunner.ui.CaptureContext
 import com.yash.feedrunner.ui.ChatMessage
 import com.yash.feedrunner.ui.ChatRole
@@ -47,11 +49,35 @@ data class RepostAnalysis(
  */
 class CopilotApi(private val transport: IdeaBankApi) {
 
-    fun analyze(imageSegments: List<String>, extraVoiceRules: String): Analysis {
+    /**
+     * One drafting call, timed.
+     *
+     * Logged because drafting moved off the device: the round trip now includes an
+     * upload to our own server before the model is even reached, and this is the
+     * only place that cost is visible. Payload size is in there because on the
+     * image calls it is the part that varies with the network.
+     */
+    private fun call(path: String, payload: JSONObject): JSONObject {
+        val started = System.currentTimeMillis()
+        val bytes = payload.toString().length
+        try {
+            return transport.copilot(path, payload)
+        } finally {
+            val took = System.currentTimeMillis() - started
+            Log.i(TAG, "$path ${took}ms sent=${bytes / 1024}kb")
+        }
+    }
+
+    fun analyze(
+        imageSegments: List<String>,
+        extraVoiceRules: String,
+        platform: Platform,
+    ): Analysis {
         val payload = JSONObject()
+            .put("platform", platform.wire)
             .put("images", JSONArray(imageSegments))
             .put("voice_rules", extraVoiceRules)
-        return parseAnalysis(transport.copilot("/copilot/replies", payload))
+        return parseAnalysis(call("/copilot/replies", payload))
     }
 
     fun repliesInAngle(
@@ -59,14 +85,16 @@ class CopilotApi(private val transport: IdeaBankApi) {
         postContext: PostContext,
         existing: List<Draft>,
         extraVoiceRules: String,
+        platform: Platform,
     ): List<Draft> {
         val payload = JSONObject()
+            .put("platform", platform.wire)
             .put("angle", angle.name)
             .put("post_context", postContext.toJson())
             .put("existing", JSONArray(existing.map { it.toJson() }))
             .put("voice_rules", extraVoiceRules)
 
-        val body = transport.copilot("/copilot/replies/angle", payload)
+        val body = call("/copilot/replies/angle", payload)
         // The angle was fixed by the request, so it is not read back.
         return readDrafts(body.optJSONArray("drafts")).map { it.copy(angle = angle) }
     }
@@ -76,15 +104,17 @@ class CopilotApi(private val transport: IdeaBankApi) {
         refinement: Refinement,
         postContext: PostContext,
         extraVoiceRules: String,
+        platform: Platform,
     ): String {
         val payload = JSONObject()
+            .put("platform", platform.wire)
             .put("draft", draft.toJson())
             // The chip labels stay a UI concern; the server takes the wording.
             .put("instruction", refinement.instruction)
             .put("post_context", postContext.toJson())
             .put("voice_rules", extraVoiceRules)
 
-        return transport.copilot("/copilot/replies/refine", payload).requireText()
+        return call("/copilot/replies/refine", payload).requireText()
     }
 
     fun chat(
@@ -93,15 +123,17 @@ class CopilotApi(private val transport: IdeaBankApi) {
         history: List<ChatMessage>,
         userMessage: String,
         extraVoiceRules: String,
+        platform: Platform,
     ): String {
         val payload = JSONObject()
+            .put("platform", platform.wire)
             .put("post_context", postContext.toJson())
             .put("drafts", JSONArray(drafts.map { it.toJson() }))
             .put("history", history.toJson())
             .put("message", userMessage)
             .put("voice_rules", extraVoiceRules)
 
-        return transport.copilot("/copilot/replies/chat", payload).requireText()
+        return call("/copilot/replies/chat", payload).requireText()
     }
 
     fun suggestPosts(
@@ -109,14 +141,16 @@ class CopilotApi(private val transport: IdeaBankApi) {
         imageSegments: List<String>,
         userText: String,
         extraVoiceRules: String,
+        platform: Platform,
     ): RepostAnalysis {
         val payload = JSONObject()
+            .put("platform", platform.wire)
             .put("mode", mode.wire)
             .put("images", JSONArray(imageSegments))
             .put("user_text", userText)
             .put("voice_rules", extraVoiceRules)
 
-        return parseRepost(transport.copilot("/copilot/posts", payload))
+        return parseRepost(call("/copilot/posts", payload))
     }
 
     fun chatPosts(
@@ -126,8 +160,10 @@ class CopilotApi(private val transport: IdeaBankApi) {
         history: List<ChatMessage>,
         userMessage: String,
         extraVoiceRules: String,
+        platform: Platform,
     ): String {
         val payload = JSONObject()
+            .put("platform", platform.wire)
             .put("mode", mode.wire)
             .put("capture_context", capture.toJson())
             .put("drafts", JSONArray(drafts.map { it.toJson() }))
@@ -135,7 +171,11 @@ class CopilotApi(private val transport: IdeaBankApi) {
             .put("message", userMessage)
             .put("voice_rules", extraVoiceRules)
 
-        return transport.copilot("/copilot/posts/chat", payload).requireText()
+        return call("/copilot/posts/chat", payload).requireText()
+    }
+
+    private companion object {
+        const val TAG = "Copilot"
     }
 
     private fun JSONObject.requireText(): String =

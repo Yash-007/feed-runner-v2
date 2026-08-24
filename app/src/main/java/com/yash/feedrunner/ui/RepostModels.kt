@@ -53,6 +53,7 @@ data class PostDraft(
 
 /** A completed generation, kept so closing the sheet does not lose it. */
 data class RepostResult(
+    val platform: Platform = Platform.X,
     val mode: RepostMode,
     val capture: CaptureContext,
     val reading: TextReading,

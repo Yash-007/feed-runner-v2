@@ -5,6 +5,7 @@ import com.yash.feedrunner.BuildConfig
 import com.yash.feedrunner.ui.ChatMessage
 import com.yash.feedrunner.ui.ChatRole
 import com.yash.feedrunner.ui.IdeaSeed
+import com.yash.feedrunner.ui.Platform
 import com.yash.feedrunner.ui.PostIdea
 import com.yash.feedrunner.ui.DayCount
 import com.yash.feedrunner.ui.SeedIdea
@@ -136,6 +137,7 @@ class IdeaBankApi(
         val payload = JSONObject().apply {
             put("client_pick_id", pick.clientPickId)
             put("source", pick.source)
+            put("platform", pick.platform.wire)
             put("variant", pick.variant)
             put("thought", pick.thought)
             put("text", pick.text)
@@ -315,6 +317,7 @@ private fun JSONObject.toRemoteSeed(): StoredSeed? = runCatching {
     StoredSeed(
         remoteId = optString("id").takeIf { it.isNotBlank() },
         clientSeedId = optString("client_seed_id"),
+        platform = Platform.fromWire(optString("platform")),
         source = SeedSource.fromWire(optString("source")),
         status = SeedStatus.fromWire(optString("status")),
         seed = IdeaSeed(

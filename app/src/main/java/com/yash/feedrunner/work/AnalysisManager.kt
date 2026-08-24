@@ -14,6 +14,7 @@ import com.yash.feedrunner.api.ImagePrep
 import com.yash.feedrunner.data.IdeaBankRepository
 import com.yash.feedrunner.data.ResultStore
 import com.yash.feedrunner.data.VoiceRulesStore
+import com.yash.feedrunner.ui.Platform
 import com.yash.feedrunner.ui.SeedSource
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicInteger
@@ -68,7 +69,7 @@ class AnalysisManager(
      * Queues [screenshot] for analysis and returns the job id to watch.
      * Takes ownership of the bitmap and recycles it when the job ends.
      */
-    fun submit(screenshot: Bitmap): Long {
+    fun submit(screenshot: Bitmap, platform: Platform): Long {
         val jobId = nextJobId++
         val client = claude
 
@@ -80,11 +81,12 @@ class AnalysisManager(
             val voiceRules = voiceRulesStore.rules
             val outcome = runCatching {
                 val segments = ImagePrep.toBase64Segments(screenshot)
-                val analysis = client.analyze(segments, voiceRules)
+                val analysis = client.analyze(segments, voiceRules, platform)
                 val saved = resultStore.save(
                     postContext = analysis.postContext,
                     drafts = analysis.drafts,
                     screenshot = screenshot,
+                    platform = platform,
                 )
                 // Banked off the first generation only, keyed on the saved result
                 // so a reopen or a refinement can never bank the same post twice.
@@ -95,6 +97,7 @@ class AnalysisManager(
                     postAuthor = analysis.postContext.author,
                     postText = analysis.postContext.postText,
                     capturedAtMillis = saved.id,
+                    platform = platform,
                 )
                 saved.id to analysis.postContext.author
             }

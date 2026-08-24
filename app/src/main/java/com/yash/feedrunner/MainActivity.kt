@@ -102,7 +102,7 @@ class MainActivity : ComponentActivity() {
                                 color = MaterialTheme.colorScheme.onBackground,
                             )
                             Text(
-                                text = "A reply and post copilot for X.",
+                                text = "A reply and post copilot for X and LinkedIn.",
                                 style = MaterialTheme.typography.bodyLarge,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.padding(top = Space.sm),
