@@ -10,8 +10,13 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.ui.draw.clip
+import com.yash.feedrunner.ui.theme.Space
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -64,6 +69,23 @@ internal fun CaptureViewer(path: String, onDismiss: () -> Unit) {
                     .align(Alignment.BottomCenter)
                     .padding(bottom = 14.dp),
             )
+        }
+
+        // Tap-anywhere still closes, but an explicit ✕ says so: a full-screen
+        // image with no control reads as stuck, especially mid-scroll where a
+        // tap might be mistaken for the start of a drag.
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .statusBarsPadding()
+                .padding(top = Space.sm, end = Space.md)
+                .size(38.dp)
+                .clip(CircleShape)
+                .background(Color.White.copy(alpha = 0.18f))
+                .clickable(onClick = onDismiss),
+        ) {
+            Text(text = "✕", color = Color.White, fontSize = 16.sp)
         }
     }
 }

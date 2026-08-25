@@ -60,6 +60,27 @@ All ten tasks (G1–G10) done and verified on device 2026-08-25:
 Verified by screenshots: setup, menu over X, reply panel via Last result,
 Ideas. X flow regression OK (Last result opens, saved strip works).
 
+## Second round (same day): text.txt feature batch — all done
+
+- Ideas is the LAUNCHER now. Header: "Ideas" + bubble pill (dot=state, tap
+  toggles service, routes to Setup + toast if perms missing) + server pill +
+  ⚙ opens MainActivity (label "Setup", launcher filter removed, still
+  exported for adb). Header one row; sync line only when pending>0.
+- Streak: compact single row (count · streak chip · mini bars), tap expands.
+  Counts ALL used picks now — backend store.UsedPickTimes (reply+post+quote,
+  was ReplyPickTimes), app StreakStore.recordUse/removeUse unconditional in
+  IdeaBankRepository. Copy says "sent today".
+- linkedin_post.md gained STRUCTURAL VARIETY section (anti AI-pattern:
+  varied openings/lengths/rhythm/endings, contrast-scaffold banned).
+- Capture viewer: translucent ✕ top-right (tap-anywhere kept).
+- New bubble icon ic_send_bubble (speech bubble + paper-plane knockout);
+  adaptive launcher icon (evergreen gradient bg + same glyph + monochrome),
+  manifest icon/roundIcon set.
+- Add-idea dialog: 5-line field, IME Default for prose.
+- Verified on device: launcher resolves to IdeasActivity, bubble pill starts
+  service, new bubble icon seen over X, dialog sized right. ic_spark now
+  unused (kept in repo).
+
 Nothing in flight. Next work starts fresh from this file.
 
 ## Known open items (older, not urgent)

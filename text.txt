@@ -96,3 +96,31 @@ some more additions from my side
 - [x] add a general tab as well for the generic queries and also add the same feature and prompt so user can make the generice queries as well.
       -> third segment in the menu, general_reply/general_post prompts on the
          backend, angles read generically (device smoke test skipped for tokens)
+
+
+
+more features or improvements:
+
+- [x] update the linkedin prompts of post generation to not keep the same pattern of the generated posts as linkedin identifies the ai generated posts
+      -> STRUCTURAL VARIETY section in linkedin_post.md: no two drafts share an
+         opening move, hard length spread, varied paragraph rhythm and endings,
+         contrast-scaffold cliches banned
+- [x] in ideas screen, there is very less space left for actually seeing ideas and scrolling them as most of the space is taken by the streaks and header above it. please adjust to make the proper space. think thoughfully first
+      -> header is one row now (subtitle only appears when syncing), streak
+         folds to a single row with mini bars, tap expands the full fortnight
+- [x] image close button should be shown shown when we open the image. think thoughtfully
+      -> translucent ✕ top-right in the capture viewer; tap-anywhere still works
+- [x] change the icon of the bubble.
+      -> speech bubble with a paper-plane knockout (ic_send_bubble)
+- [x] give some good icon to our app.
+      -> adaptive launcher icon: evergreen gradient tile, same send-bubble glyph,
+         monochrome variant for themed icons
+- [x] larger the text area while writing my own seed idea.
+      -> 5-line field in the add-idea dialog, return key kept for prose
+- [x] the home page of the app should be the ideas page. not the page where we shows start bubble and all. we need to fit the bubble start and stop in idea page somewhere. pls think about the ui and ux perspective and take the decisions
+      -> IdeasActivity is the launcher; header gains a bubble pill (dot = state,
+         tap toggles, routes to Setup if permissions missing) and a ⚙ that opens
+         the old screen, now 'Setup' (permissions, voice rules, appearance)
+- [x] also include the post generated or repost in the streaks. (consider when we use them). also first think about it what make more sense.
+      -> counted when marked used (copy), same as replies: backend streak now
+         reads reply+post+quote picks, local tally matches, card says 'sent today'

@@ -73,14 +73,14 @@ class StreakStore(context: Context) {
         )
     }
 
-    /** Counts a reply the moment it is copied. */
-    fun recordReply() {
+    /** Counts a used draft (reply, post or quote) the moment it is copied. */
+    fun recordUse() {
         val key = localKey(today())
         prefs.edit().putInt(key, prefs.getInt(key, 0) + 1).apply()
     }
 
     /** Undoes that when the used marker is cleared again. */
-    fun removeReply() {
+    fun removeUse() {
         val key = localKey(today())
         val next = (prefs.getInt(key, 0) - 1).coerceAtLeast(0)
         prefs.edit().putInt(key, next).apply()

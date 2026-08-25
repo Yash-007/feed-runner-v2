@@ -118,9 +118,10 @@ class IdeaBankRepository(context: Context) {
      */
     fun recordPick(pick: DraftPick) {
         pickOutbox.put(pick)
-        // Counted now so the streak moves the moment a reply is copied, with or
-        // without a reachable backend.
-        if (pick.source == "reply") streakStore.recordReply()
+        // Counted now so the streak moves the moment a draft is copied, with or
+        // without a reachable backend. Replies, posts and quotes all count: the
+        // habit is shipping something, whichever shape it took.
+        streakStore.recordUse()
         Log.i(TAG, "picked ${pick.clientPickId} (${pick.variant})")
         flushAsync()
     }
@@ -128,7 +129,7 @@ class IdeaBankRepository(context: Context) {
     /** Mirrors unmarking "used": the pick is removed rather than annotated. */
     fun removePick(clientPickId: String) {
         pickOutbox.delete(clientPickId)
-        if (clientPickId.startsWith("reply-")) streakStore.removeReply()
+        streakStore.removeUse()
         Log.i(TAG, "unpicked $clientPickId")
         flushAsync()
     }

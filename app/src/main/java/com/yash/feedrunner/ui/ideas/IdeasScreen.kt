@@ -98,6 +98,9 @@ fun IdeasScreen(state: IdeasUiState, actions: IdeasActions) {
         Header(
             pendingCount = state.pendingCount,
             serverReachable = state.serverReachable,
+            bubbleRunning = state.bubbleRunning,
+            onToggleBubble = actions.onToggleBubble,
+            onOpenSetup = actions.onOpenSetup,
             onEditAddress = { showAddressDialog = true },
         )
 
@@ -160,6 +163,7 @@ fun IdeasScreen(state: IdeasUiState, actions: IdeasActions) {
             supporting = "It joins the bank, and opens so you can generate from it.",
             label = "the post you want to write",
             confirm = "Add",
+            minLines = 5,
             onDismiss = { showManualDialog = false },
             onConfirm = {
                 actions.onAddManual(it)
@@ -184,15 +188,30 @@ fun IdeasScreen(state: IdeasUiState, actions: IdeasActions) {
     }
 }
 
+/**
+ * The home header. Ideas is the screen you sit down with, so the things that used
+ * to live on a separate front page — is the bubble on, is everything set up —
+ * live here now, as two small controls beside the title.
+ *
+ * Kept to one row plus an occasional sync line: this header and the streak card
+ * were eating the space the seeds need.
+ */
 @Composable
-private fun Header(pendingCount: Int, serverReachable: Boolean?, onEditAddress: () -> Unit) {
+private fun Header(
+    pendingCount: Int,
+    serverReachable: Boolean?,
+    bubbleRunning: Boolean,
+    onToggleBubble: () -> Unit,
+    onOpenSetup: () -> Unit,
+    onEditAddress: () -> Unit,
+) {
     WashHeader(padStatusBar = true) {
       Column(
           modifier = Modifier.padding(
               start = Space.lg,
               end = Space.sm,
-              top = Space.xl,
-              bottom = Space.lg,
+              top = Space.md,
+              bottom = Space.md,
           ),
       ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -202,46 +221,74 @@ private fun Header(pendingCount: Int, serverReachable: Boolean?, onEditAddress: 
                 color = MaterialTheme.colorScheme.onBackground,
                 modifier = Modifier.weight(1f),
             )
+            // The bubble is the app's whole point, so its switch lives on the
+            // home screen: a dot for its state, one tap to flip it.
+            HeaderPill(
+                label = "bubble",
+                dotColor = if (bubbleRunning) {
+                    Color(0xFF00BA7C)
+                } else {
+                    MaterialTheme.colorScheme.outline
+                },
+                onClick = onToggleBubble,
+            )
             // A dot beats a word: the only thing worth knowing at a glance is
-            // whether the laptop is answering.
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
+            // whether the backend is answering. Tap edits the address.
+            HeaderPill(
+                label = "server",
+                dotColor = when (serverReachable) {
+                    true -> Color(0xFF00BA7C)
+                    false -> MaterialTheme.colorScheme.error
+                    null -> MaterialTheme.colorScheme.outline
+                },
+                onClick = onEditAddress,
+            )
+            // Permissions, voice rules and appearance moved one tap away.
+            Text(
+                text = "⚙",
+                fontSize = 17.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier
                     .clip(RoundedCornerShape(14.dp))
-                    .clickable(onClick = onEditAddress)
+                    .clickable(onClick = onOpenSetup)
                     .padding(horizontal = 10.dp, vertical = 6.dp),
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(7.dp)
-                        .clip(CircleShape)
-                        .background(
-                            when (serverReachable) {
-                                true -> Color(0xFF00BA7C)
-                                false -> MaterialTheme.colorScheme.error
-                                null -> MaterialTheme.colorScheme.outline
-                            },
-                        ),
-                )
-                Text(
-                    text = "server",
-                    fontSize = 12.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(start = 6.dp),
-                )
-            }
+            )
         }
-        Text(
-            text = if (pendingCount > 0) {
-                "$pendingCount waiting to sync · pull down to retry"
-            } else {
-                "Saved from your replies and posts · pull down to refresh"
-            },
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(top = Space.xs),
-        )
+        // Only sync trouble earns a second line; the happy path stays quiet.
+        if (pendingCount > 0) {
+            Text(
+                text = "$pendingCount waiting to sync · pull down to retry",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = Space.xs),
+            )
+        }
       }
+    }
+}
+
+/** A dot-and-word control in the header: state at a glance, action on tap. */
+@Composable
+private fun HeaderPill(label: String, dotColor: Color, onClick: () -> Unit) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .clip(RoundedCornerShape(14.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 8.dp, vertical = 6.dp),
+    ) {
+        Box(
+            modifier = Modifier
+                .size(7.dp)
+                .clip(CircleShape)
+                .background(dotColor),
+        )
+        Text(
+            text = label,
+            fontSize = 12.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(start = 5.dp),
+        )
     }
 }
 
@@ -446,6 +493,8 @@ private fun TextEntryDialog(
     confirm: String,
     initial: String = "",
     supporting: String? = null,
+    /** More than one for prose (an idea); one for identifiers (an address). */
+    minLines: Int = 1,
     onDismiss: () -> Unit,
     onConfirm: (String) -> Unit,
 ) {
@@ -464,9 +513,12 @@ private fun TextEntryDialog(
                     value = text,
                     onValueChange = { text = it },
                     placeholder = { Text(label) },
+                    minLines = minLines,
+                    maxLines = (minLines * 2).coerceAtLeast(1),
                     keyboardOptions = KeyboardOptions(
                         capitalization = KeyboardCapitalization.Sentences,
-                        imeAction = ImeAction.Done,
+                        // Prose keeps its return key; a one-liner submits on Done.
+                        imeAction = if (minLines > 1) ImeAction.Default else ImeAction.Done,
                     ),
                     keyboardActions = KeyboardActions(
                         onDone = { if (text.isNotBlank()) onConfirm(text) },

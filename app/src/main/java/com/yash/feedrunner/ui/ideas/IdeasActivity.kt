@@ -54,6 +54,8 @@ data class IdeasUiState(
     val pendingDelete: StoredSeed? = null,
     /** Always present: cached locally, so a dead backend cannot hide the card. */
     val streak: Streak = Streak(),
+    /** Mirrors BubbleService.running for the header's bubble switch. */
+    val bubbleRunning: Boolean = false,
 ) {
     val backendConfigured: Boolean get() = baseUrl.isNotEmpty()
 
@@ -98,6 +100,8 @@ data class IdeasActions(
     val onSetBaseUrl: (String) -> Unit,
     val onCopy: (String) -> Unit,
     val onAskDelete: (StoredSeed) -> Unit,
+    val onToggleBubble: () -> Unit,
+    val onOpenSetup: () -> Unit,
 )
 
 /**
@@ -150,7 +154,9 @@ class IdeasActivity : ComponentActivity() {
                         )
                     } else {
                         IdeasScreen(
-                            state = state,
+                            // Read here so the header's dot follows the service
+                            // as it starts and stops.
+                            state = state.copy(bubbleRunning = BubbleService.running.value),
                             actions = IdeasActions(
                                 onRefresh = ::refresh,
                                 onFilterChange = ::changeFilter,
@@ -168,6 +174,8 @@ class IdeasActivity : ComponentActivity() {
                                 onSetBaseUrl = ::setBaseUrl,
                                 onCopy = ::copy,
                                 onAskDelete = { state = state.copy(pendingDelete = it) },
+                                onToggleBubble = ::toggleBubble,
+                                onOpenSetup = ::openSetup,
                             ),
                         )
                     }
@@ -343,6 +351,40 @@ class IdeasActivity : ComponentActivity() {
         repository.backendConfig.baseUrl = url
         state = state.copy(baseUrl = repository.backendConfig.baseUrl, serverReachable = null)
         refresh()
+    }
+
+    /**
+     * The header's bubble switch. When setup is incomplete the switch cannot
+     * work, so it takes you to the screen that can fix it instead of failing.
+     */
+    private fun toggleBubble() {
+        if (BubbleService.running.value) {
+            BubbleService.stop(this)
+            return
+        }
+        if (!setupComplete()) {
+            toast("Finish setup first")
+            openSetup()
+            return
+        }
+        BubbleService.start(this)
+    }
+
+    private fun openSetup() {
+        startActivity(android.content.Intent(this, com.yash.feedrunner.MainActivity::class.java))
+    }
+
+    private fun setupComplete(): Boolean {
+        if (!android.provider.Settings.canDrawOverlays(this)) return false
+        val expected = android.content.ComponentName(
+            this,
+            com.yash.feedrunner.capture.CaptureService::class.java,
+        ).flattenToString()
+        val enabled = android.provider.Settings.Secure.getString(
+            contentResolver,
+            android.provider.Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES,
+        ).orEmpty()
+        return enabled.split(':').any { it.equals(expected, ignoreCase = true) }
     }
 
     private fun copy(text: String) {

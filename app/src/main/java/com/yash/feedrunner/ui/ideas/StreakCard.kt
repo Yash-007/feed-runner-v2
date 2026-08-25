@@ -1,5 +1,7 @@
 package com.yash.feedrunner.ui.ideas
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -10,11 +12,9 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -26,72 +26,95 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.yash.feedrunner.ui.Streak
 import com.yash.feedrunner.ui.theme.MetaTextStyle
-import com.yash.feedrunner.ui.theme.Space
+import com.yash.feedrunner.ui.theme.Motion
 import com.yash.feedrunner.ui.theme.Radius
+import com.yash.feedrunner.ui.theme.Space
 import com.yash.feedrunner.ui.theme.HairlineCard
 
 /**
- * The daily reply habit.
+ * The daily shipping habit.
  *
- * Counts come from picks, so a bar means a reply you actually copied out and used,
- * not a draft the app generated. That makes the number honest, and it is the only
- * reason it is worth looking at.
+ * Counts come from picks — replies, posts and quotes you actually copied out —
+ * so a bar means something went out, not that the app generated drafts.
  *
- * Deliberately quiet: a number, a run, and fourteen bars. A louder treatment would
- * compete with the seeds, which are the point of this screen.
+ * One compact row by default: this card sits above the seeds, which are the
+ * point of the screen, so it earns one line and expands on tap for the history.
  */
 @Composable
 internal fun StreakCard(streak: Streak, modifier: Modifier = Modifier) {
-    // Deliberately not on a wash. The header band is directly above it, and two
-    // gradients touching read as one smear rather than two surfaces.
+    var expanded by remember { mutableStateOf(false) }
+
     HairlineCard(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(Radius.card),
+        onClick = { expanded = !expanded },
     ) {
-        Column(modifier = Modifier.padding(horizontal = Space.lg, vertical = Space.lg)) {
-            Row(verticalAlignment = Alignment.Bottom) {
+        Column(
+            modifier = Modifier
+                .animateContentSize(animationSpec = Motion.enter())
+                .padding(horizontal = Space.lg, vertical = Space.md),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     text = "${streak.today}",
-                    style = MaterialTheme.typography.headlineMedium,
+                    style = MaterialTheme.typography.titleLarge,
                     color = MaterialTheme.colorScheme.onBackground,
                 )
                 Text(
-                    text = if (streak.today == 1) " reply today" else " replies today",
+                    text = " sent today",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(start = Space.xs, bottom = 4.dp),
+                    modifier = Modifier.padding(start = Space.xs),
                 )
                 Box(modifier = Modifier.weight(1f))
                 if (streak.current > 0) {
                     Text(
                         text = "${streak.current} day streak",
-                        style = MaterialTheme.typography.labelLarge,
+                        style = MaterialTheme.typography.labelMedium,
                         fontWeight = FontWeight.SemiBold,
                         color = StreakAccent,
                         modifier = Modifier
                             .clip(RoundedCornerShape(Radius.chip))
                             .background(StreakAccent.copy(alpha = 0.18f))
-                            .padding(horizontal = Space.md, vertical = Space.xs),
+                            .padding(horizontal = Space.sm, vertical = 3.dp),
+                    )
+                }
+                // The collapsed card still shows the shape of the fortnight,
+                // just small enough to stay one line tall.
+                if (!expanded) {
+                    DayStrip(
+                        streak = streak,
+                        maxBarHeight = 18.dp,
+                        modifier = Modifier
+                            .padding(start = Space.md)
+                            .width(88.dp),
                     )
                 }
             }
 
-            DayStrip(
-                streak = streak,
-                modifier = Modifier.padding(top = Space.lg),
-            )
-
-            if (streak.longest > 0) {
-                Text(
-                    text = "best ${streak.longest} days · ${streak.total} replies all time",
-                    style = MetaTextStyle,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(top = Space.md),
-                )
+            AnimatedVisibility(visible = expanded) {
+                Column {
+                    DayStrip(
+                        streak = streak,
+                        maxBarHeight = 34.dp,
+                        modifier = Modifier
+                            .padding(top = Space.md)
+                            .fillMaxWidth(),
+                    )
+                    if (streak.longest > 0) {
+                        Text(
+                            text = "best ${streak.longest} days · ${streak.total} sent all time" +
+                                " · replies, posts and quotes count",
+                            style = MetaTextStyle,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(top = Space.md),
+                        )
+                    }
+                }
             }
         }
     }
@@ -103,8 +126,10 @@ internal fun StreakCard(streak: Streak, modifier: Modifier = Modifier) {
  * line of stubs.
  */
 @Composable
-private fun DayStrip(streak: Streak, modifier: Modifier = Modifier) {
+private fun DayStrip(streak: Streak, maxBarHeight: Dp, modifier: Modifier = Modifier) {
     val busiest = streak.busiestDay.coerceAtLeast(1)
+    val minBarHeight = maxBarHeight * 0.3f
+    val emptyBarHeight = 3.dp
 
     // Bars grow in left to right on first show. Purely a hello — the stagger is
     // short enough to be over before the eye starts reading the shape.
@@ -112,21 +137,21 @@ private fun DayStrip(streak: Streak, modifier: Modifier = Modifier) {
     LaunchedEffect(Unit) { appeared = true }
 
     Row(
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        horizontalArrangement = Arrangement.spacedBy(3.dp),
         verticalAlignment = Alignment.Bottom,
-        modifier = modifier.height(MaxBarHeight),
+        modifier = modifier.height(maxBarHeight),
     ) {
         streak.days.forEachIndexed { index, day ->
             val isToday = index == streak.days.lastIndex
             val fraction = day.count.toFloat() / busiest
             val height = if (day.count == 0) {
-                EmptyBarHeight
+                emptyBarHeight
             } else {
-                // Floor at a visible height: one reply should not be a sliver.
-                MinBarHeight + (MaxBarHeight - MinBarHeight) * fraction
+                // Floor at a visible height: one send should not be a sliver.
+                minBarHeight + (maxBarHeight - minBarHeight) * fraction
             }
             val animatedHeight by animateDpAsState(
-                targetValue = if (appeared) height else EmptyBarHeight,
+                targetValue = if (appeared) height else emptyBarHeight,
                 animationSpec = tween(durationMillis = 300, delayMillis = index * 25),
                 label = "streakBar",
             )
@@ -135,7 +160,7 @@ private fun DayStrip(streak: Streak, modifier: Modifier = Modifier) {
                 modifier = Modifier
                     .weight(1f)
                     .height(animatedHeight)
-                    .clip(RoundedCornerShape(3.dp))
+                    .clip(RoundedCornerShape(2.dp))
                     .background(
                         when {
                             day.count == 0 -> MaterialTheme.colorScheme.onSurfaceVariant
@@ -149,9 +174,5 @@ private fun DayStrip(streak: Streak, modifier: Modifier = Modifier) {
     }
 }
 
-/** Same green used for a posted seed, so "kept it up" reads the same everywhere. */
+/** Same green as a posted seed, so "kept it up" reads the same everywhere. */
 private val StreakAccent = androidx.compose.ui.graphics.Color(0xFF00BA7C)
-
-private val MaxBarHeight = 34.dp
-private val MinBarHeight = 10.dp
-private val EmptyBarHeight = 4.dp

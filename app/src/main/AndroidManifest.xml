@@ -17,18 +17,17 @@
     -->
     <application
         android:label="Feed Runner"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher_round"
         android:theme="@style/AppTheme"
         android:usesCleartextTraffic="true"
         android:allowBackup="false">
 
+        <!-- Setup lives one tap behind Ideas: permissions, voice rules, theme. -->
         <activity
             android:name=".MainActivity"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
-        </activity>
+            android:label="Setup"
+            android:exported="true" />
 
         <service
             android:name=".capture.CaptureService"
@@ -51,11 +50,19 @@
                 android:value="Floating reply-assistant bubble overlay" />
         </service>
 
+        <!--
+            The Ideas bank is the home screen: it is what you sit down with,
+            while the bubble does its work from inside other apps.
+        -->
         <activity
             android:name=".ui.ideas.IdeasActivity"
-            android:exported="false"
-            android:label="Ideas"
-            android:windowSoftInputMode="adjustResize" />
+            android:exported="true"
+            android:windowSoftInputMode="adjustResize">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
 
     </application>
 </manifest>

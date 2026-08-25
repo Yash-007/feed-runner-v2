@@ -244,7 +244,7 @@ class BubbleService : Service() {
         )
 
         val icon = ImageView(this).apply {
-            setImageResource(com.yash.feedrunner.R.drawable.ic_spark)
+            setImageResource(com.yash.feedrunner.R.drawable.ic_send_bubble)
         }
         circle.addView(
             icon,
