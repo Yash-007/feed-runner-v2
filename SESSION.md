@@ -103,6 +103,23 @@ Ideas. X flow regression OK (Last result opens, saved strip works).
   matched two lines and curl sent a broken auth header (HTTP 000 / empty
   reply). Line deleted; grep with `^ideaBank.token=` from now on.
 
+## Fourth round (same day): menu icons + shared slider + regenerate — done
+
+- Menu platform toggle shows brand icons (ic_brand_x / _linkedin / _general,
+  simplified vectors) via a new iconRes slot on SegmentedControl; labels stay
+  as content descriptions. Verified on device.
+- Reply sheet: second WordLimitSlider beside the drafts + "↻ regenerate
+  drafts" chip (shown only when the capture file still exists). Both sliders
+  bind the same replyLimit state/store — drag one, the other follows
+  (verified). Regenerate = PanelController.regenerate(): decodes stored
+  capturePath off-main, resubmits to AnalysisManager at the current cap;
+  panel flips to the skeleton loading state in place (window not reopened).
+  Saves as a new result. Verified E2E on device against the deployed backend.
+- Cap obedience finding: wiring was perfect, the model soft-overshoots small
+  caps on rich captures (28-33 words against 15; probes with empty rules
+  obeyed). Backend cap wording hardened (6cf5d8b): highest priority, count
+  and recount. App commit be13a56.
+
 Nothing in flight. Next work starts fresh from this file.
 
 ## Known open items (older, not urgent)
