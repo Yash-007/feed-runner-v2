@@ -81,6 +81,22 @@ Ideas. X flow regression OK (Last result opens, saved strip works).
   service, new bubble icon seen over X, dialog sized right. ic_spark now
   unused (kept in repo).
 
+## Third round (same day): word-limit slider — done
+
+- WordLimitSlider in DesignSystem: hand-drawn (hairline track, evergreen
+  gradient fill, white thumb, haptic notch ticks); far-right notch = "auto"
+  (no cap, the default); readout chip shows "auto" / "≤ N words". Gesture
+  handlers read state via rememberUpdatedState — keying pointerInput on the
+  value kills a drag at its first notch (bug found on device, fixed).
+- Reply panel: slider above the composer, 10–60 step 5. Repost composer:
+  20–150 step 10. Caps persist in WordLimitStore (prefs; reply + post keys,
+  0 = auto) and apply to analyze/angle/refine/chat and posts/chat calls.
+- Wire: word_limit int on all six /copilot bodies; backend appends a hard-cap
+  line via the voice-rules block (arrives last, overrides — no llm-layer
+  change). Absent/0 = no cap, old servers ignore the field.
+- Verified on device: render, drag-snap, tap-to-set, auto reset. Committed +
+  pushed: app 0e1632c, backend e8d3d5a (Render auto-deploy).
+
 Nothing in flight. Next work starts fresh from this file.
 
 ## Known open items (older, not urgent)
