@@ -104,6 +104,7 @@ fun ReplyPanel(
     onChatFocusChanged: (Boolean) -> Unit,
     wordLimit: Int,
     onWordLimit: (Int) -> Unit,
+    onRegenerate: () -> Unit,
     onRetry: () -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -182,6 +183,7 @@ fun ReplyPanel(
                         state = state,
                         wordLimit = wordLimit,
                         onWordLimit = onWordLimit,
+                        onRegenerate = onRegenerate,
                         onDraftCopy = onDraftCopy,
                         onToggleUsed = onToggleUsed,
                         onRefine = onRefine,
@@ -377,6 +379,7 @@ private fun ReadyBody(
     state: PanelState.Ready,
     wordLimit: Int,
     onWordLimit: (Int) -> Unit,
+    onRegenerate: () -> Unit,
     onDraftCopy: (Draft) -> Unit,
     onToggleUsed: (Draft) -> Unit,
     onRefine: (Draft, Refinement) -> Unit,
@@ -454,6 +457,32 @@ private fun ReadyBody(
                     onToggleUsed = { onToggleUsed(draft) },
                     onRefine = { refinement -> onRefine(draft, refinement) },
                 )
+            }
+
+            // The same cap as the slider by the composer — one value, two
+            // handles — with the do-over right beside it: a fresh first batch
+            // at the length now under the thumb. Costs a full analysis call.
+            Column {
+                WordLimitSlider(
+                    value = wordLimit,
+                    range = 10..60,
+                    step = 5,
+                    onValueChange = onWordLimit,
+                )
+                if (state.capturePath != null) {
+                    Text(
+                        text = "↻  regenerate drafts",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier
+                            .align(Alignment.End)
+                            .padding(top = Space.xs)
+                            .pressClickable(pressedScale = 0.94f, onClick = onRegenerate)
+                            .clip(RoundedCornerShape(Radius.chip))
+                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.10f))
+                            .padding(horizontal = Space.md, vertical = Space.sm),
+                    )
+                }
             }
 
             Text(

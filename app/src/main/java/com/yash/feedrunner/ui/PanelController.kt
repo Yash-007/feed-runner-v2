@@ -196,6 +196,7 @@ class PanelController(
                     onChatFocusChanged = window::setFocusable,
                     wordLimit = replyLimit,
                     onWordLimit = ::setWordLimit,
+                    onRegenerate = ::regenerate,
                     onRetry = ::dismiss,
                     onDismiss = ::dismiss,
                 )
@@ -208,6 +209,36 @@ class PanelController(
     private fun setWordLimit(limit: Int) {
         replyLimit = limit
         wordLimits.replyLimit = limit
+    }
+
+    /**
+     * Re-runs the first-capture batch from the stored screenshot, picking up
+     * whatever the length slider says now. A full analysis call on purpose:
+     * the drafts being replaced came from the image, so their replacements
+     * should read it too, not just the extracted text.
+     */
+    private fun regenerate() {
+        val ready = state as? PanelState.Ready ?: return
+        val path = ready.capturePath
+        if (path == null) {
+            Toast.makeText(context, "The capture behind this result is gone", Toast.LENGTH_SHORT)
+                .show()
+            return
+        }
+        val requestPlatform = ready.platform
+        generation++
+        state = PanelState.Loading
+        worker.execute {
+            val bitmap = android.graphics.BitmapFactory.decodeFile(path)
+            handler.post {
+                if (bitmap == null) {
+                    state = PanelState.Error("Could not reload the capture.")
+                } else {
+                    platform = requestPlatform
+                    watchedJobId = analysisManager.submit(bitmap, requestPlatform)
+                }
+            }
+        }
     }
 
     private fun refineDraft(draft: Draft, refinement: Refinement) {

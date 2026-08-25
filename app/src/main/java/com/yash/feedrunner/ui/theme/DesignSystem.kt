@@ -158,6 +158,11 @@ fun <T> SegmentedControl(
     thumbColor: Color = MaterialTheme.colorScheme.primary,
     onThumbColor: Color = MaterialTheme.colorScheme.onPrimary,
     textStyle: androidx.compose.ui.text.TextStyle = MaterialTheme.typography.labelLarge,
+    /**
+     * Drawable per option. When set, segments show the icon instead of the
+     * label; the label survives as the content description.
+     */
+    iconRes: ((T) -> Int)? = null,
 ) {
     val trackShape = RoundedCornerShape(Radius.control)
     val thumbShape = RoundedCornerShape(Radius.chip)
@@ -215,12 +220,21 @@ fun <T> SegmentedControl(
                         animationSpec = tween(200),
                         label = "segText",
                     )
-                    Text(
-                        text = label(option),
-                        style = textStyle,
-                        maxLines = 1,
-                        color = textColor,
-                    )
+                    if (iconRes != null) {
+                        androidx.compose.foundation.Image(
+                            painter = androidx.compose.ui.res.painterResource(iconRes(option)),
+                            contentDescription = label(option),
+                            colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(textColor),
+                            modifier = Modifier.size(16.dp),
+                        )
+                    } else {
+                        Text(
+                            text = label(option),
+                            style = textStyle,
+                            maxLines = 1,
+                            color = textColor,
+                        )
+                    }
                 }
             }
         }

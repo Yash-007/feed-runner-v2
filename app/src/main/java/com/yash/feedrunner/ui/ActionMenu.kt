@@ -41,6 +41,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.yash.feedrunner.R
 import com.yash.feedrunner.ui.theme.Hairline
 import com.yash.feedrunner.ui.theme.Motion
 import com.yash.feedrunner.ui.theme.Radius
@@ -155,6 +156,8 @@ fun ActionMenu(
                             .padding(horizontal = Space.sm),
                         contentAlignment = Alignment.Center,
                     ) {
+                        // Icons, not words: at this width three brand marks read
+                        // faster than "LinkedIn" squeezed next to "General".
                         SegmentedControl(
                             options = Platform.entries.toList(),
                             selected = platform,
@@ -162,7 +165,13 @@ fun ActionMenu(
                             onSelect = onPlatform,
                             thumbColor = platform.hue,
                             onThumbColor = Color.White,
-                            textStyle = MaterialTheme.typography.labelMedium,
+                            iconRes = {
+                                when (it) {
+                                    Platform.X -> R.drawable.ic_brand_x
+                                    Platform.LINKEDIN -> R.drawable.ic_brand_linkedin
+                                    Platform.GENERAL -> R.drawable.ic_brand_general
+                                }
+                            },
                         )
                     }
 
