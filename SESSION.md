@@ -118,7 +118,8 @@ Ideas. X flow regression OK (Last result opens, saved strip works).
 - Cap obedience finding: wiring was perfect, the model soft-overshoots small
   caps on rich captures (28-33 words against 15; probes with empty rules
   obeyed). Backend cap wording hardened (6cf5d8b): highest priority, count
-  and recount. App commit be13a56.
+  and recount — re-probed after deploy, all six drafts 9-10 words on a 15
+  cap with real voice rules. App commit be13a56.
 
 Nothing in flight. Next work starts fresh from this file.
 
