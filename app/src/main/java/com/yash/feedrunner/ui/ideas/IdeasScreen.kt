@@ -109,7 +109,7 @@ fun IdeasScreen(state: IdeasUiState, actions: IdeasActions) {
             tag = state.tagFilter,
             tags = state.availableTags,
             platform = state.platformFilter,
-            showPlatforms = state.hasBothPlatforms,
+            platforms = state.presentPlatforms,
             onStatus = actions.onFilterChange,
             onTag = actions.onTagFilterChange,
             onPlatform = actions.onPlatformFilterChange,
@@ -249,7 +249,7 @@ private fun FilterBar(
     tag: String?,
     tags: List<String>,
     platform: Platform?,
-    showPlatforms: Boolean,
+    platforms: List<Platform>,
     onStatus: (SeedStatus?) -> Unit,
     onTag: (String?) -> Unit,
     onPlatform: (Platform?) -> Unit,
@@ -257,14 +257,14 @@ private fun FilterBar(
     Column {
         // Hidden until the bank holds seeds from both networks; a filter with
         // one possible answer is noise.
-        if (showPlatforms) {
+        if (platforms.size > 1) {
             Row(
                 modifier = Modifier
                     .padding(start = 16.dp, end = 16.dp, top = 10.dp)
                     .horizontalScroll(rememberScrollState()),
                 horizontalArrangement = Arrangement.spacedBy(7.dp),
             ) {
-                Platform.entries.forEach { entry ->
+                platforms.forEach { entry ->
                     val active = platform == entry
                     Text(
                         text = entry.label,

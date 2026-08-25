@@ -144,8 +144,8 @@ private fun ChipRow(seed: StoredSeed, modifier: Modifier = Modifier) {
         horizontalArrangement = Arrangement.spacedBy(5.dp),
         modifier = modifier.horizontalScroll(rememberScrollState()),
     ) {
-        // X is the historical default, so only the marked case gets a chip.
-        if (seed.platform == Platform.LINKEDIN) {
+        // X is the historical default, so only the marked cases get a chip.
+        if (seed.platform != Platform.X) {
             Chip(
                 text = seed.platform.label,
                 container = seed.platform.hue.copy(alpha = 0.16f),

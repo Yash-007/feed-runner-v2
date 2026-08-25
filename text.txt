@@ -89,5 +89,10 @@ some more additions from my side
 - [x] also add the dark mode feature in the app.
       -> Appearance card on setup: System / Light / Dark, followed by the
          overlay panels too since they share FeedRunnerTheme
-- after completion. try this on linkedin app on my device and see how its working and check if there's some changes need to be make like while capturing the screen, ui, ux or any other.
-- add a general tab as well for the generic queries and also add the same feature and prompt so user can make the generice queries as well.
+- [x] after completion. try this on linkedin app on my device and see how its working and check if there's some changes need to be make like while capturing the screen, ui, ux or any other.
+      -> tested on the real app: detection auto-picked LinkedIn, capture read the
+         right post out of the feed, drafts were comment-appropriate. no UX
+         changes needed so far.
+- [x] add a general tab as well for the generic queries and also add the same feature and prompt so user can make the generice queries as well.
+      -> third segment in the menu, general_reply/general_post prompts on the
+         backend, angles read generically (device smoke test skipped for tokens)

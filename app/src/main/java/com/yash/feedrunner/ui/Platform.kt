@@ -11,7 +11,10 @@ import androidx.compose.ui.graphics.Color
  */
 enum class Platform(val wire: String, val label: String, val hue: Color) {
     X("x", "X", Color(0xFF657786)),
-    LINKEDIN("linkedin", "LinkedIn", Color(0xFF0A66C2));
+    LINKEDIN("linkedin", "LinkedIn", Color(0xFF0A66C2)),
+
+    /** Whatever is on screen: a chat, an email, an article, an error. */
+    GENERAL("general", "General", Color(0xFFB4552D));
 
     companion object {
         /** Absent or unknown means X: everything stored before LinkedIn existed. */

@@ -67,10 +67,9 @@ data class IdeasUiState(
             .map { it.key }
             .take(MAX_TAG_CHIPS)
 
-    /** True once seeds from both networks exist, which is when a filter earns a row. */
-    val hasBothPlatforms: Boolean
-        get() = seeds.any { it.platform == Platform.LINKEDIN } &&
-            seeds.any { it.platform == Platform.X }
+    /** The platforms actually in the bank; the filter row earns its place at two. */
+    val presentPlatforms: List<Platform>
+        get() = Platform.entries.filter { p -> seeds.any { it.platform == p } }
 
     /** The status filter is applied server-side; tag and platform are local. */
     val visibleSeeds: List<StoredSeed>
