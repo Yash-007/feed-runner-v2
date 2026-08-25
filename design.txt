@@ -77,3 +77,39 @@ art would look worse than none.
     Reply text sits over X and needs its contrast.
   - Angle chips: pale fills with darker text of the same hue. The one place we do
     not follow the single accent rule, because the colour is doing real work.
+
+# Polish pass — "super perfect" round (2026-08-25)
+
+Findings from on-device test: action menu is floating disconnected pills over a
+busy feed with no scrim and four random accent hues; status bar is a black band
+(not edge-to-edge); seed cards carry up to 5 chips before content; loading is a
+bare spinner; nothing has press feedback; segmented controls jump-cut instead of
+slide. Research direction (M3 Expressive 2026): purposeful spring motion,
+micro-interactions as feedback not decoration, clarity-first minimalism,
+edge-to-edge as table stakes.
+
+## Tasks
+
+  [x] G1  Edge-to-edge: both activities, wash headers run behind the status bar,
+          bottom insets handled; no more black band
+  [x] G2  Motion foundation in DesignSystem: one spring token set, press-scale
+          modifier on every button/card/chip, animated disabled states
+  [x] G3  Shared segmented control with a sliding thumb; used by theme picker,
+          platform toggle, post/quote mode
+  [x] G4  Action menu redesign: scrim, one connected card (platform row + four
+          action rows split by hairlines), soft tinted icon chips instead of
+          solid saturated circles, spring entrance staggered from the bubble,
+          haptics on open; menu height accounts for the platform row
+  [x] G5  Panels: spring slide-up entrance + scrim fade, drag handle, slimmer
+          header; loading becomes shimmer skeleton drafts + cycling status line;
+          error state gets a proper retry button
+  [x] G6  Draft cards: press feedback, animated "copied" confirmation, refine
+          as a real chip affordance
+  [x] G7  Ideas: seed cards decluttered (status chip + platform chip only, source
+          folded into the meta line), streak bars animate in, header edge-to-edge
+  [x] G8  Setup screen: bubble card promoted above voice rules, permission
+          checklist collapses to one "Ready" row once granted, voice rules
+          collapsible
+  [x] G9  Meta text 10sp -> 11sp, consistency sweep on Close/copied/chips
+  [x] G10 Build, install, on-device screenshots: menu, panel, ideas, setup;
+          X flow regression via Last result

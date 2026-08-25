@@ -1,5 +1,7 @@
 package com.yash.feedrunner.ui.ideas
 
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -15,6 +17,11 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -99,6 +106,11 @@ internal fun StreakCard(streak: Streak, modifier: Modifier = Modifier) {
 private fun DayStrip(streak: Streak, modifier: Modifier = Modifier) {
     val busiest = streak.busiestDay.coerceAtLeast(1)
 
+    // Bars grow in left to right on first show. Purely a hello — the stagger is
+    // short enough to be over before the eye starts reading the shape.
+    var appeared by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { appeared = true }
+
     Row(
         horizontalArrangement = Arrangement.spacedBy(4.dp),
         verticalAlignment = Alignment.Bottom,
@@ -113,11 +125,16 @@ private fun DayStrip(streak: Streak, modifier: Modifier = Modifier) {
                 // Floor at a visible height: one reply should not be a sliver.
                 MinBarHeight + (MaxBarHeight - MinBarHeight) * fraction
             }
+            val animatedHeight by animateDpAsState(
+                targetValue = if (appeared) height else EmptyBarHeight,
+                animationSpec = tween(durationMillis = 300, delayMillis = index * 25),
+                label = "streakBar",
+            )
 
             Box(
                 modifier = Modifier
                     .weight(1f)
-                    .height(height)
+                    .height(animatedHeight)
                     .clip(RoundedCornerShape(3.dp))
                     .background(
                         when {

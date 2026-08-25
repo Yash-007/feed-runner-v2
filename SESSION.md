@@ -31,22 +31,34 @@ session (or another account) to continue: it assumes nothing from chat history.
 - Checklists live in repo files (task.txt, design.txt, text.txt) and get
   ticked as work lands.
 
-## Current task: from text.txt additions
+## Current task: UI/UX polish pass (design.txt "Polish pass" section)
 
-1. [x] Evergreen theme replacing purple (#0E7A55 / mint dark), bubble matched
-2. [x] Dark mode: Appearance card (System/Light/Dark) on setup screen,
-       process-global ThemePreference, overlays follow it (verified: dark menu
-       over light LinkedIn)
-3. [x] LinkedIn support end to end (prompts, platform on all routes/stores,
-       menu toggle w/ auto-detect, chips, Ideas filter) — verified on the real
-       LinkedIn app: detection auto-selected LinkedIn, captured a CoinDCX post,
-       comment-appropriate drafts (human/appreciate/ask)
-4. [x] General tab: backend + app shipped. Verified against the deployed
-       backend with a text-only call (an email reply, general prompt answered
-       in kind, no tool confusion). Menu's three segments were confirmed in an
-       earlier screenshot. Image capture path shares LinkedIn's proven code.
-5. [x] Device theme reset to System (verified via theme.xml prefs).
-6. [x] App repo committed + pushed (4f814f1).
+All ten tasks (G1–G10) done and verified on device 2026-08-25:
+
+- Edge-to-edge everywhere (wash behind status bar; nav-bar padding on bottom
+  bars/composers). enableEdgeToEdge in MainActivity + IdeasActivity.
+- DesignSystem gained: Motion (spring tokens), Modifier.pressClickable (press
+  scale on every button/card/chip), SegmentedControl (sliding thumb; used by
+  theme picker, menu platform toggle, post/quote), Modifier.shimmer.
+- Action menu redesigned: scrim + ONE connected card (platform segmented row +
+  4 hairline-split rows, soft tinted icon circles from Accent hues), spring
+  scale-in from the bubble side, haptic on open. Menu height now includes the
+  platform row.
+- Panels: spring slide-up + scrim fade-in, drag handle, slimmer header;
+  loading = shimmer skeleton drafts + cycling stage line; error = PrimaryButton
+  retry. Repost panel same treatment; GeneratingRow also shows skeletons.
+- Draft cards: "✓ copied — paste it in" in green w/ scale-in; refine is a
+  tinted chip. Chips everywhere got press feedback.
+- Ideas: seed cards decluttered (source+age fold into one meta line, max
+  platform/status/shelf-life chips), streak bars animate in staggered.
+- Setup: permission checklist folds to "Set up and ready ✓" once granted
+  (tap = details), bubble card moved above voice rules, voice rules card folds
+  to a one-line preview with edit.
+- Wash palettes re-anchored on evergreen (mint/sage/cream/sky; dark variants
+  match). Meta text 10sp -> 11sp. Bubble dips on tap (scale animation).
+
+Verified by screenshots: setup, menu over X, reply panel via Last result,
+Ideas. X flow regression OK (Last result opens, saved strip works).
 
 Nothing in flight. Next work starts fresh from this file.
 

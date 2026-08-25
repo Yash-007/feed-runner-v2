@@ -74,9 +74,16 @@ import kotlinx.coroutines.withContext
 import com.yash.feedrunner.ui.theme.MetaTextStyle
 import com.yash.feedrunner.ui.theme.SoftAccentChip
 import com.yash.feedrunner.ui.theme.HairlineCard
+import com.yash.feedrunner.ui.theme.Motion
+import com.yash.feedrunner.ui.theme.PrimaryButton
 import com.yash.feedrunner.ui.theme.WashHeader
 import com.yash.feedrunner.ui.theme.Radius
 import com.yash.feedrunner.ui.theme.Space
+import com.yash.feedrunner.ui.theme.pressClickable
+import com.yash.feedrunner.ui.theme.shimmer
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.layout.height
 import com.yash.feedrunner.ui.theme.VerticalHairline
 
@@ -108,14 +115,31 @@ fun ReplyPanel(
     // corner, so the jump button has to get out of the way while you are typing.
     var chatFocused by remember { mutableStateOf(false) }
 
+    // The sheet rises rather than appearing: the window itself cannot animate,
+    // so the entrance lives on the content.
+    var entered by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { entered = true }
+    val scrim by animateFloatAsState(
+        targetValue = if (entered) 0.45f else 0f,
+        animationSpec = tween(200),
+        label = "panelScrim",
+    )
+
     // Scrim: tapping outside the sheet dismisses.
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.Black.copy(alpha = 0.45f))
+            .background(Color.Black.copy(alpha = scrim))
             .clickable(onClick = onDismiss),
         contentAlignment = Alignment.BottomCenter,
     ) {
+        AnimatedVisibility(
+            visible = entered,
+            enter = slideInVertically(
+                animationSpec = Motion.enter(),
+                initialOffsetY = { it / 3 },
+            ) + fadeIn(tween(150)),
+        ) {
         Surface(
             shape = PanelShape,
             color = MaterialTheme.colorScheme.surface,
@@ -191,6 +215,7 @@ fun ReplyPanel(
               }
             }
         }
+        }
 
         viewerPath?.let { path ->
             CaptureViewer(path = path, onDismiss = { viewerPath = null })
@@ -200,10 +225,21 @@ fun ReplyPanel(
 
 @Composable
 private fun PanelHeader(platform: Platform?, onDismiss: () -> Unit) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+    // The sheet grammar every bottom sheet teaches: this is a surface that rose
+    // from the bottom, and the scrim above it is tappable.
+    Box(
+        modifier = Modifier
+            .padding(top = Space.sm)
+            .size(width = 36.dp, height = 4.dp)
+            .clip(RoundedCornerShape(2.dp))
+            .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.35f))
+            .align(Alignment.CenterHorizontally),
+    )
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(start = Space.lg, end = Space.sm, top = Space.md, bottom = Space.md),
+            .padding(start = Space.lg, end = Space.sm, bottom = Space.sm),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
@@ -230,33 +266,104 @@ private fun PanelHeader(platform: Platform?, onDismiss: () -> Unit) {
                 .padding(horizontal = Space.md, vertical = Space.sm),
         )
     }
+    }
 }
 
+/**
+ * Skeleton drafts plus a status line that moves through the actual stages.
+ *
+ * The shape of what is coming beats a spinner: it promises drafts specifically,
+ * and the changing line keeps a slow backend from reading as a hang.
+ */
 @Composable
 private fun LoadingBody() {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 32.dp),
-        horizontalArrangement = Arrangement.Center,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
-        Text(
-            text = "Reading the post…",
-            modifier = Modifier.padding(start = 12.dp),
-            style = MaterialTheme.typography.bodyMedium,
-        )
+    var stage by remember { mutableIntStateOf(0) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(1700)
+            stage = (stage + 1).coerceAtMost(LOADING_STAGES.lastIndex)
+        }
+    }
+
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.padding(vertical = 2.dp),
+        ) {
+            CircularProgressIndicator(modifier = Modifier.size(14.dp), strokeWidth = 2.dp)
+            androidx.compose.animation.Crossfade(
+                targetState = stage,
+                animationSpec = tween(300),
+                label = "loadingStage",
+            ) { index ->
+                Text(
+                    text = LOADING_STAGES[index],
+                    modifier = Modifier.padding(start = 10.dp),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+        repeat(2) { SkeletonDraftCard() }
+    }
+}
+
+private val LOADING_STAGES = listOf(
+    "Reading the post…",
+    "Picking the angles…",
+    "Writing drafts…",
+    "Almost there…",
+)
+
+/** The outline of a draft card, shimmering until the real one lands. */
+@Composable
+internal fun SkeletonDraftCard() {
+    HairlineCard(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(Space.lg)) {
+            Box(
+                modifier = Modifier
+                    .size(width = 64.dp, height = 18.dp)
+                    .clip(RoundedCornerShape(Radius.chip))
+                    .shimmer(),
+            )
+            Box(
+                modifier = Modifier
+                    .padding(top = 10.dp)
+                    .fillMaxWidth()
+                    .height(13.dp)
+                    .clip(RoundedCornerShape(4.dp))
+                    .shimmer(),
+            )
+            Box(
+                modifier = Modifier
+                    .padding(top = 6.dp)
+                    .fillMaxWidth(0.72f)
+                    .height(13.dp)
+                    .clip(RoundedCornerShape(4.dp))
+                    .shimmer(),
+            )
+        }
     }
 }
 
 @Composable
 private fun ErrorBody(message: String, onRetry: () -> Unit) {
-    Column(modifier = Modifier.padding(vertical = 24.dp)) {
-        Text(text = message, style = MaterialTheme.typography.bodyMedium)
-        TextButton(onClick = onRetry, modifier = Modifier.padding(top = 8.dp)) {
-            Text("Retry")
-        }
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 24.dp),
+    ) {
+        Text(
+            text = message,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        PrimaryButton(
+            label = "Try again",
+            modifier = Modifier.padding(top = Space.lg),
+            onClick = onRetry,
+        )
     }
 }
 
@@ -680,25 +787,30 @@ private fun DraftCard(
                     },
             )
 
-            AnimatedVisibility(visible = copied) {
+            AnimatedVisibility(
+                visible = copied,
+                enter = fadeIn() + scaleIn(initialScale = 0.9f),
+                exit = fadeOut(),
+            ) {
                 Text(
-                    text = "copied, paste in X",
+                    text = "✓ copied — paste it in",
                     style = MetaTextStyle,
-                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.SemiBold,
+                    color = UsedGreen,
                     modifier = Modifier.padding(top = 4.dp),
                 )
             }
 
             Text(
                 text = if (showRefinements) "refine ▴" else "refine ▾",
-                style = MetaTextStyle,
-                fontWeight = FontWeight.SemiBold,
+                style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.primary,
                 modifier = Modifier
-                    .padding(top = 6.dp)
-                    .clip(RoundedCornerShape(8.dp))
+                    .padding(top = 8.dp)
+                    .clip(RoundedCornerShape(Radius.chip))
+                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.08f))
                     .clickable { showRefinements = !showRefinements }
-                    .padding(horizontal = 6.dp, vertical = 4.dp),
+                    .padding(horizontal = Space.sm, vertical = Space.xs),
             )
 
             AnimatedVisibility(visible = showRefinements || draft.refining) {
@@ -772,9 +884,9 @@ private fun RefinementChip(label: String, enabled: Boolean, onClick: () -> Unit)
         style = MaterialTheme.typography.labelMedium,
         color = MaterialTheme.colorScheme.onSurface.copy(alpha = alpha),
         modifier = Modifier
+            .pressClickable(enabled = enabled, pressedScale = 0.94f, onClick = onClick)
             .clip(shape)
             .border(Space.hair, MaterialTheme.colorScheme.outlineVariant, shape)
-            .clickable(enabled = enabled, onClick = onClick)
             .padding(horizontal = Space.md, vertical = Space.sm),
     )
 }

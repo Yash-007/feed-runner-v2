@@ -7,7 +7,8 @@ import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.foundation.layout.safeDrawingPadding
+import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -112,6 +113,8 @@ class IdeasActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // The wash runs behind the status bar; screens pad their own edges.
+        enableEdgeToEdge()
         repository = IdeaBankRepository(this)
         state = state.copy(
             baseUrl = repository.backendConfig.baseUrl,
@@ -120,10 +123,10 @@ class IdeasActivity : ComponentActivity() {
 
         setContent {
             FeedRunnerTheme {
-                // targetSdk 35 draws edge to edge, so without this the composer sits
-                // under the navigation bar and the header under the status bar.
-                // safeDrawing covers the keyboard too, which is what a chat wants.
-                Surface(modifier = Modifier.safeDrawingPadding()) {
+                // Only the keyboard inset is handled here; status and navigation
+                // bars are the screens' own job, so their headers can run edge
+                // to edge behind the status bar.
+                Surface(modifier = Modifier.imePadding()) {
                     state.pendingDelete?.let { seed ->
                         ConfirmDeleteSeedDialog(
                             seed = seed,

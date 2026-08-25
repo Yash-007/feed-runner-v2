@@ -10,7 +10,10 @@ import android.provider.Settings
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -44,13 +47,17 @@ import androidx.compose.ui.graphics.Color
 import com.yash.feedrunner.ui.theme.ThemeMode
 import com.yash.feedrunner.ui.theme.ThemePreference
 import com.yash.feedrunner.ui.theme.FeedRunnerTheme
+import com.yash.feedrunner.ui.theme.Motion
+import com.yash.feedrunner.ui.theme.SegmentedControl
 import com.yash.feedrunner.ui.theme.WashHeader
 import com.yash.feedrunner.ui.theme.Space
 import com.yash.feedrunner.ui.theme.SecondaryButton
 import com.yash.feedrunner.ui.theme.Radius
 import com.yash.feedrunner.ui.theme.PrimaryButton
 import com.yash.feedrunner.ui.theme.HairlineCard
+import com.yash.feedrunner.ui.theme.pressClickable
 import com.yash.feedrunner.ui.theme.Accent
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.ui.draw.clip
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -70,6 +77,8 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // The wash runs behind the status bar instead of under a black band.
+        enableEdgeToEdge()
 
         if (Build.VERSION.SDK_INT >= 33) {
             notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
@@ -91,6 +100,7 @@ class MainActivity : ComponentActivity() {
                     // then everything below it stays plain.
                     WashHeader(
                         modifier = Modifier.padding(bottom = Space.lg),
+                        padStatusBar = true,
                     ) {
                         Column(
                             modifier = Modifier.padding(
@@ -125,48 +135,6 @@ class MainActivity : ComponentActivity() {
                             onOpenAccessibilitySettings = ::openAccessibilitySettings,
                         )
 
-                        HairlineCard {
-                            Column(modifier = Modifier.padding(Space.lg)) {
-                                Text(
-                                    text = "Extra voice rules",
-                                    style = MaterialTheme.typography.titleMedium,
-                                )
-                                Text(
-                                    text = "Optional. Your full voice is already built in; " +
-                                        "these are appended last and override the rest.",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.padding(top = Space.xs),
-                                )
-                                OutlinedTextField(
-                                    value = voiceRules,
-                                    onValueChange = { voiceRules = it },
-                                    shape = RoundedCornerShape(Radius.control),
-                                    colors = OutlinedTextFieldDefaults.colors(
-                                        unfocusedBorderColor =
-                                            MaterialTheme.colorScheme.outlineVariant,
-                                    ),
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(top = Space.md)
-                                        .height(140.dp),
-                                    textStyle = MaterialTheme.typography.bodySmall,
-                                )
-                                SecondaryButton(
-                                    label = "Save extra rules",
-                                    modifier = Modifier.padding(top = Space.md),
-                                    onClick = {
-                                        voiceRulesStore.rules = voiceRules
-                                        Toast.makeText(
-                                            this@MainActivity,
-                                            "Extra rules saved",
-                                            Toast.LENGTH_SHORT,
-                                        ).show()
-                                    },
-                                )
-                            }
-                        }
-
                         if (hasOverlayPermission && captureServiceEnabled) {
                             val bubbleRunning = BubbleService.running.value
                             HairlineCard {
@@ -189,7 +157,7 @@ class MainActivity : ComponentActivity() {
                                         )
                                         Text(
                                             text = if (bubbleRunning) {
-                                                "Bubble is running · open X and tap it"
+                                                "Bubble is running · open X or LinkedIn and tap it"
                                             } else {
                                                 "Bubble is off"
                                             },
@@ -235,6 +203,19 @@ class MainActivity : ComponentActivity() {
                             }
                         }
 
+                        VoiceRulesCard(
+                            value = voiceRules,
+                            onValueChange = { voiceRules = it },
+                            onSave = {
+                                voiceRulesStore.rules = voiceRules
+                                Toast.makeText(
+                                    this@MainActivity,
+                                    "Extra rules saved",
+                                    Toast.LENGTH_SHORT,
+                                ).show()
+                            },
+                        )
+
                         HairlineCard {
                             Column(modifier = Modifier.padding(Space.lg)) {
                                 Text(
@@ -248,55 +229,21 @@ class MainActivity : ComponentActivity() {
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     modifier = Modifier.padding(top = Space.xs),
                                 )
-                                val trackShape = RoundedCornerShape(Radius.control)
-                                val current = ThemePreference.mode.value
-                                Row(
-                                    modifier = Modifier
-                                        .padding(top = Space.md)
-                                        .fillMaxWidth()
-                                        .clip(trackShape)
-                                        .border(
-                                            Space.hair,
-                                            MaterialTheme.colorScheme.outlineVariant,
-                                            trackShape,
-                                        )
-                                        .padding(Space.xs),
-                                ) {
-                                    ThemeMode.entries.forEach { option ->
-                                        val selected = option == current
-                                        Box(
-                                            contentAlignment = Alignment.Center,
-                                            modifier = Modifier
-                                                .weight(1f)
-                                                .clip(RoundedCornerShape(Radius.chip))
-                                                .background(
-                                                    if (selected) {
-                                                        MaterialTheme.colorScheme.primary
-                                                    } else {
-                                                        Color.Transparent
-                                                    },
-                                                )
-                                                .clickable(enabled = !selected) {
-                                                    ThemePreference.set(this@MainActivity, option)
-                                                }
-                                                .padding(vertical = Space.sm),
-                                        ) {
-                                            Text(
-                                                text = option.label,
-                                                style = MaterialTheme.typography.labelLarge,
-                                                color = if (selected) {
-                                                    MaterialTheme.colorScheme.onPrimary
-                                                } else {
-                                                    MaterialTheme.colorScheme.onSurfaceVariant
-                                                },
-                                            )
-                                        }
-                                    }
-                                }
+                                SegmentedControl(
+                                    options = ThemeMode.entries.toList(),
+                                    selected = ThemePreference.mode.value,
+                                    label = { it.label },
+                                    onSelect = { ThemePreference.set(this@MainActivity, it) },
+                                    modifier = Modifier.padding(top = Space.md),
+                                )
                             }
                         }
 
-                        Spacer(Modifier.height(Space.xl))
+                        Spacer(
+                            Modifier
+                                .navigationBarsPadding()
+                                .height(Space.xl),
+                        )
                     }
                 }
                 }
@@ -346,6 +293,11 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+/**
+ * The permission checklist. Once everything is granted it folds into a single
+ * quiet line — a solved checklist is history, not information — and a tap
+ * unfolds it again for checking.
+ */
 @androidx.compose.runtime.Composable
 private fun SetupSection(
     hasOverlayPermission: Boolean,
@@ -353,22 +305,130 @@ private fun SetupSection(
     onOpenOverlaySettings: () -> Unit,
     onOpenAccessibilitySettings: () -> Unit,
 ) {
-    HairlineCard {
-        ReadyRow(
-            done = hasOverlayPermission,
-            doneLabel = "Overlay permission granted",
-            todoLabel = "Allow drawing over other apps",
-            action = "Grant",
-            onAction = onOpenOverlaySettings,
-        )
-        Hairline()
-        ReadyRow(
-            done = captureServiceEnabled,
-            doneLabel = "Capture service enabled",
-            todoLabel = "Enable the capture service under Accessibility",
-            action = "Open settings",
-            onAction = onOpenAccessibilitySettings,
-        )
+    val allDone = hasOverlayPermission && captureServiceEnabled
+    var expanded by remember { mutableStateOf(false) }
+
+    HairlineCard(onClick = if (allDone) ({ expanded = !expanded }) else null) {
+        Column(modifier = Modifier.animateContentSize(animationSpec = Motion.enter())) {
+            if (allDone && !expanded) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.padding(horizontal = Space.lg, vertical = Space.md),
+                ) {
+                    Text(
+                        text = "✓",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = Accent.lastResult,
+                    )
+                    Text(
+                        text = "Set up and ready",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier
+                            .padding(start = Space.md)
+                            .weight(1f),
+                    )
+                    Text(
+                        text = "details",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                }
+            } else {
+                ReadyRow(
+                    done = hasOverlayPermission,
+                    doneLabel = "Overlay permission granted",
+                    todoLabel = "Allow drawing over other apps",
+                    action = "Grant",
+                    onAction = onOpenOverlaySettings,
+                )
+                Hairline()
+                ReadyRow(
+                    done = captureServiceEnabled,
+                    doneLabel = "Capture service enabled",
+                    todoLabel = "Enable the capture service under Accessibility",
+                    action = "Open settings",
+                    onAction = onOpenAccessibilitySettings,
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Extra voice rules, folded by default. They are set once and rarely touched, so
+ * the card shows just enough to remember they exist.
+ */
+@androidx.compose.runtime.Composable
+private fun VoiceRulesCard(
+    value: String,
+    onValueChange: (String) -> Unit,
+    onSave: () -> Unit,
+) {
+    var expanded by remember { mutableStateOf(false) }
+
+    HairlineCard(onClick = if (expanded) null else ({ expanded = true })) {
+        Column(
+            modifier = Modifier
+                .animateContentSize(animationSpec = Motion.enter())
+                .padding(Space.lg),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Extra voice rules",
+                        style = MaterialTheme.typography.titleMedium,
+                    )
+                    Text(
+                        text = if (expanded) {
+                            "Optional. Your full voice is already built in; these are " +
+                                "appended last and override the rest."
+                        } else {
+                            value.trim().lineSequence().firstOrNull()
+                                ?.takeIf { it.isNotBlank() }
+                                ?: "None set. Your full voice is already built in."
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = if (expanded) Int.MAX_VALUE else 1,
+                        modifier = Modifier.padding(top = Space.xs),
+                    )
+                }
+                Text(
+                    text = if (expanded) "fold" else "edit",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier
+                        .padding(start = Space.sm)
+                        .clip(RoundedCornerShape(Radius.chip))
+                        .clickable { expanded = !expanded }
+                        .padding(horizontal = Space.sm, vertical = Space.xs),
+                )
+            }
+
+            AnimatedVisibility(visible = expanded) {
+                Column {
+                    OutlinedTextField(
+                        value = value,
+                        onValueChange = onValueChange,
+                        shape = RoundedCornerShape(Radius.control),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
+                        ),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = Space.md)
+                            .height(140.dp),
+                        textStyle = MaterialTheme.typography.bodySmall,
+                    )
+                    SecondaryButton(
+                        label = "Save extra rules",
+                        modifier = Modifier.padding(top = Space.md),
+                        onClick = onSave,
+                    )
+                }
+            }
+        }
     }
 }
 

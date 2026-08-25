@@ -63,7 +63,9 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.layout.navigationBarsPadding
 import com.yash.feedrunner.ui.theme.WashHeader
+import com.yash.feedrunner.ui.theme.pressClickable
 import com.yash.feedrunner.ui.theme.Space
 import com.yash.feedrunner.ui.theme.SecondaryButton
 import com.yash.feedrunner.ui.theme.Radius
@@ -184,7 +186,7 @@ fun IdeasScreen(state: IdeasUiState, actions: IdeasActions) {
 
 @Composable
 private fun Header(pendingCount: Int, serverReachable: Boolean?, onEditAddress: () -> Unit) {
-    WashHeader {
+    WashHeader(padStatusBar = true) {
       Column(
           modifier = Modifier.padding(
               start = Space.lg,
@@ -329,7 +331,7 @@ private fun FilterChip(label: String, active: Boolean, onClick: () -> Unit) {
         } else {
             BorderStroke(Space.hair, MaterialTheme.colorScheme.outlineVariant)
         },
-        modifier = Modifier.clickable(onClick = onClick),
+        modifier = Modifier.pressClickable(pressedScale = 0.94f, onClick = onClick),
     ) {
         Text(
             text = label,
@@ -378,6 +380,7 @@ private fun BottomBar(onAddManual: () -> Unit) {
             modifier = Modifier
                 .fillMaxWidth()
                 .background(MaterialTheme.colorScheme.surface)
+                .navigationBarsPadding()
                 .padding(horizontal = Space.lg, vertical = Space.md),
         ) {
             Text(

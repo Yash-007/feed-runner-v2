@@ -93,6 +93,6 @@ fun FeedRunnerTheme(
 /** Text style helper for the small meta lines used across the panels. */
 internal val MetaTextStyle = TextStyle(
     fontFamily = Figtree,
-    fontSize = 10.sp,
-    lineHeight = 13.sp,
+    fontSize = 11.sp,
+    lineHeight = 14.sp,
 )

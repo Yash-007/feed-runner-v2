@@ -56,6 +56,7 @@ import com.yash.feedrunner.ui.theme.Space
 import com.yash.feedrunner.ui.theme.MetaTextStyle
 import com.yash.feedrunner.ui.theme.SoftAccentChip
 import com.yash.feedrunner.ui.theme.RoundIconButton
+import androidx.compose.foundation.layout.navigationBarsPadding
 import com.yash.feedrunner.ui.theme.Hairline
 
 /**
@@ -233,7 +234,7 @@ private fun ThreadHeader(
 
     // The seed itself is the heading of this screen, so it gets the wash and the
     // serif that a screen title gets everywhere else.
-    WashHeader {
+    WashHeader(padStatusBar = true) {
         Column(modifier = Modifier.padding(start = 6.dp, end = 6.dp, top = Space.md, bottom = Space.md)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
@@ -502,6 +503,7 @@ private fun Composer(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier
                 .background(MaterialTheme.colorScheme.surface)
+                .navigationBarsPadding()
                 .padding(horizontal = Space.md, vertical = Space.md),
         ) {
             OutlinedTextField(

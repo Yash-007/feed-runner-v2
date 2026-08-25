@@ -1,24 +1,44 @@
 package com.yash.feedrunner.ui.theme
 
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.composed
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
@@ -30,6 +50,7 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.ShaderBrush
 import androidx.compose.ui.graphics.TileMode
 import androidx.compose.ui.graphics.drawscope.CanvasDrawScope
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Canvas as GraphicsCanvas
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Density
@@ -70,6 +91,170 @@ object Radius {
 }
 
 /**
+ * One spring vocabulary for the whole app.
+ *
+ * Everything that moves uses one of these three, so unrelated surfaces still feel
+ * like the same object physics. Numbers over names ("snappy") because the numbers
+ * are what get tuned.
+ */
+object Motion {
+    /** Selection thumbs, press scales: quick and just barely soft. */
+    fun <T> settle() = spring<T>(dampingRatio = 0.85f, stiffness = Spring.StiffnessMediumLow)
+
+    /** Entrances: enough bounce to feel alive, never enough to wobble. */
+    fun <T> enter() = spring<T>(dampingRatio = 0.7f, stiffness = Spring.StiffnessMedium)
+}
+
+/**
+ * Press feedback: the element gives slightly under the finger.
+ *
+ * This is the app's one universal micro-interaction, standing in for ripples,
+ * which overlay windows render inconsistently. Applied through [pressClickable]
+ * rather than by hand so every tappable thing gives by the same amount.
+ */
+fun Modifier.pressClickable(
+    enabled: Boolean = true,
+    pressedScale: Float = 0.97f,
+    onClick: () -> Unit,
+): Modifier = composed {
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (pressed && enabled) pressedScale else 1f,
+        animationSpec = Motion.settle(),
+        label = "pressScale",
+    )
+    this
+        .graphicsLayer {
+            scaleX = scale
+            scaleY = scale
+        }
+        .clickable(
+            interactionSource = interaction,
+            indication = null,
+            enabled = enabled,
+            onClick = onClick,
+        )
+}
+
+/**
+ * The segmented control: one track, a thumb that slides between options instead
+ * of teleporting. Used for theme, platform and post/quote choices, which were
+ * three hand-rolled copies of the same row before this.
+ */
+@Composable
+fun <T> SegmentedControl(
+    options: List<T>,
+    selected: T,
+    label: (T) -> String,
+    onSelect: (T) -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    thumbColor: Color = MaterialTheme.colorScheme.primary,
+    onThumbColor: Color = MaterialTheme.colorScheme.onPrimary,
+    textStyle: androidx.compose.ui.text.TextStyle = MaterialTheme.typography.labelLarge,
+) {
+    val trackShape = RoundedCornerShape(Radius.control)
+    val thumbShape = RoundedCornerShape(Radius.chip)
+    val index = options.indexOf(selected).coerceAtLeast(0)
+
+    BoxWithConstraints(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(trackShape)
+            .border(Space.hair, MaterialTheme.colorScheme.outlineVariant, trackShape)
+            .padding(Space.xs),
+    ) {
+        val segmentWidth = maxWidth / options.size
+        val thumbOffset by animateDpAsState(
+            targetValue = segmentWidth * index,
+            animationSpec = Motion.settle(),
+            label = "segThumb",
+        )
+        val animatedThumbColor by androidx.compose.animation.animateColorAsState(
+            targetValue = thumbColor,
+            animationSpec = tween(200),
+            label = "segThumbColor",
+        )
+
+        Box(
+            modifier = Modifier
+                .offset(x = thumbOffset)
+                .width(segmentWidth)
+                .height(SegmentHeight)
+                .clip(thumbShape)
+                .background(animatedThumbColor),
+        )
+
+        Row {
+            options.forEach { option ->
+                val active = option == selected
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(SegmentHeight)
+                        .clip(thumbShape)
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                            enabled = enabled && !active,
+                        ) { onSelect(option) },
+                ) {
+                    val textColor by androidx.compose.animation.animateColorAsState(
+                        targetValue = if (active) {
+                            onThumbColor
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        },
+                        animationSpec = tween(200),
+                        label = "segText",
+                    )
+                    Text(
+                        text = label(option),
+                        style = textStyle,
+                        maxLines = 1,
+                        color = textColor,
+                    )
+                }
+            }
+        }
+    }
+}
+
+private val SegmentHeight = 34.dp
+
+/**
+ * The loading texture: a soft band of the primary drifting across a pale block.
+ * Skeletons built from this read as "the real thing is coming", where a lone
+ * spinner reads as "nothing is happening".
+ */
+@Composable
+fun Modifier.shimmer(): Modifier {
+    val transition = rememberInfiniteTransition(label = "shimmer")
+    val progress by transition.animateFloat(
+        initialValue = -1f,
+        targetValue = 2f,
+        animationSpec = infiniteRepeatable(tween(durationMillis = 1100)),
+        label = "shimmerSweep",
+    )
+    val base = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.10f)
+    val highlight = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.045f)
+    return this.drawBehind {
+        drawRect(base)
+        val bandWidth = size.width * 0.6f
+        val start = progress * size.width
+        drawRect(
+            brush = Brush.linearGradient(
+                colors = listOf(Color.Transparent, highlight, Color.Transparent),
+                start = Offset(start, 0f),
+                end = Offset(start + bandWidth, size.height),
+            ),
+        )
+    }
+}
+
+/**
  * Pastel fields, four hues drifting into each other.
  *
  * Kept desaturated on purpose. They are a ground for near-black text to sit on, so
@@ -77,9 +262,9 @@ object Radius {
  */
 private val LightWash = listOf(
     Color(0xFFCCF1E4),
-    Color(0xFFE7DFFA),
-    Color(0xFFFBD9E6),
-    Color(0xFFD6E6FF),
+    Color(0xFFE2F3D9),
+    Color(0xFFFBEFD9),
+    Color(0xFFD6ECFF),
 )
 
 /**
@@ -88,9 +273,9 @@ private val LightWash = listOf(
  */
 private val DarkWash = listOf(
     Color(0xFF11241F),
-    Color(0xFF171232),
-    Color(0xFF241426),
-    Color(0xFF10182E),
+    Color(0xFF15221A),
+    Color(0xFF241E14),
+    Color(0xFF101C2E),
 )
 
 /**
@@ -170,6 +355,8 @@ private fun dotTile(
 internal fun WashHeader(
     modifier: Modifier = Modifier,
     shape: Shape = RoundedCornerShape(0.dp),
+    /** True on activity screens, where the wash runs behind the status bar. */
+    padStatusBar: Boolean = false,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     Column(
@@ -177,7 +364,10 @@ internal fun WashHeader(
             .fillMaxWidth()
             .clip(shape)
             .background(washBrush())
-            .halftone(),
+            .halftone()
+            .then(
+                if (padStatusBar) Modifier.windowInsetsPadding(WindowInsets.statusBars) else Modifier,
+            ),
         content = content,
     )
 }
@@ -197,14 +387,18 @@ internal fun HairlineCard(
     fill: Color = Color.Transparent,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    val clickable = if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier
+    val clickable = if (onClick != null) {
+        Modifier.pressClickable(pressedScale = 0.985f, onClick = onClick)
+    } else {
+        Modifier
+    }
     Column(
         modifier = modifier
             .fillMaxWidth()
+            .then(clickable)
             .clip(shape)
             .background(fill)
-            .border(Space.hair, MaterialTheme.colorScheme.outlineVariant, shape)
-            .then(clickable),
+            .border(Space.hair, MaterialTheme.colorScheme.outlineVariant, shape),
         content = content,
     )
 }
@@ -218,14 +412,13 @@ internal fun PrimaryButton(
     onClick: () -> Unit,
 ) {
     val shape = RoundedCornerShape(Radius.control)
+    val alpha by animateFloatAsState(if (enabled) 1f else 0.4f, tween(200), label = "btnAlpha")
     Box(
         contentAlignment = Alignment.Center,
         modifier = modifier
+            .pressClickable(enabled = enabled, pressedScale = 0.96f, onClick = onClick)
             .clip(shape)
-            .background(
-                MaterialTheme.colorScheme.primary.copy(alpha = if (enabled) 1f else 0.4f),
-            )
-            .clickable(enabled = enabled, onClick = onClick)
+            .background(MaterialTheme.colorScheme.primary.copy(alpha = alpha))
             .padding(horizontal = Space.lg, vertical = Space.md),
     ) {
         Text(
@@ -248,10 +441,10 @@ internal fun SecondaryButton(
     Box(
         contentAlignment = Alignment.Center,
         modifier = modifier
+            .pressClickable(enabled = enabled, pressedScale = 0.96f, onClick = onClick)
             .clip(shape)
             .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.10f))
             .border(Space.hair, MaterialTheme.colorScheme.primary.copy(alpha = 0.25f), shape)
-            .clickable(enabled = enabled, onClick = onClick)
             .padding(horizontal = Space.lg, vertical = Space.md),
     ) {
         Text(
@@ -271,15 +464,14 @@ internal fun RoundIconButton(
     enabled: Boolean = true,
     onClick: () -> Unit,
 ) {
+    val alpha by animateFloatAsState(if (enabled) 1f else 0.35f, tween(200), label = "iconAlpha")
     Box(
         contentAlignment = Alignment.Center,
         modifier = modifier
             .size(diameter)
+            .pressClickable(enabled = enabled, pressedScale = 0.9f, onClick = onClick)
             .clip(RoundedCornerShape(diameter / 2))
-            .background(
-                MaterialTheme.colorScheme.primary.copy(alpha = if (enabled) 1f else 0.35f),
-            )
-            .clickable(enabled = enabled, onClick = onClick),
+            .background(MaterialTheme.colorScheme.primary.copy(alpha = alpha)),
     ) {
         Text(
             text = glyph,

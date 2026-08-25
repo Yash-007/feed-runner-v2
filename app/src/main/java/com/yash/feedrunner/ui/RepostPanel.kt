@@ -64,7 +64,12 @@ import androidx.compose.ui.unit.sp
 import com.yash.feedrunner.ui.theme.MetaTextStyle
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.border
+import com.yash.feedrunner.ui.theme.Motion
+import com.yash.feedrunner.ui.theme.SegmentedControl
 import com.yash.feedrunner.ui.theme.WashHeader
 import com.yash.feedrunner.ui.theme.Space
 import com.yash.feedrunner.ui.theme.SoftAccentChip
@@ -140,13 +145,29 @@ fun RepostPanel(
         resetKey = ready?.result?.savedAtMillis,
     )
 
+    // Same entrance as the reply sheet: scrim fades, sheet rises and settles.
+    var entered by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { entered = true }
+    val scrim by animateFloatAsState(
+        targetValue = if (entered) 0.45f else 0f,
+        animationSpec = tween(200),
+        label = "repostScrim",
+    )
+
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.Black.copy(alpha = 0.45f))
+            .background(Color.Black.copy(alpha = scrim))
             .clickable(onClick = onDismiss),
         contentAlignment = Alignment.BottomCenter,
     ) {
+        AnimatedVisibility(
+            visible = entered,
+            enter = slideInVertically(
+                animationSpec = Motion.enter(),
+                initialOffsetY = { it / 3 },
+            ) + fadeIn(tween(150)),
+        ) {
         Surface(
             shape = SheetShape,
             color = MaterialTheme.colorScheme.surface,
@@ -167,14 +188,23 @@ fun RepostPanel(
                 Column(modifier = Modifier.verticalScroll(scrollState)) {
                     // A band behind the title only, same as the reply sheet.
                     WashHeader {
+                        Box(
+                            modifier = Modifier
+                                .padding(top = Space.sm)
+                                .size(width = 36.dp, height = 4.dp)
+                                .clip(RoundedCornerShape(2.dp))
+                                .background(
+                                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.35f),
+                                )
+                                .align(Alignment.CenterHorizontally),
+                        )
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(
                                     start = Space.lg,
                                     end = Space.sm,
-                                    top = Space.md,
-                                    bottom = Space.md,
+                                    bottom = Space.sm,
                                 ),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
@@ -280,6 +310,7 @@ fun RepostPanel(
             }
             }
         }
+        }
 
         viewerPath?.let { path ->
             CaptureViewer(path = path, onDismiss = { viewerPath = null })
@@ -372,47 +403,14 @@ private fun ModeToggle(
     fun label(option: RepostMode): String =
         if (platform == Platform.LINKEDIN && option == RepostMode.QUOTE) "Repost" else option.label
 
-    // A track drawn with a hairline, and the chosen half filled with the accent.
-    // The old version tinted the whole track and lifted the selection with a
-    // lighter fill, which relies on shadow and elevation this design does not use.
-    val trackShape = RoundedCornerShape(Radius.control)
-    Row(
-        modifier = Modifier
-            .padding(top = Space.md)
-            .fillMaxWidth()
-            .clip(trackShape)
-            .border(Space.hair, MaterialTheme.colorScheme.outlineVariant, trackShape)
-            .padding(Space.xs),
-    ) {
-        RepostMode.entries.forEach { option ->
-            val selected = option == mode
-            Box(
-                contentAlignment = Alignment.Center,
-                modifier = Modifier
-                    .weight(1f)
-                    .clip(RoundedCornerShape(Radius.chip))
-                    .background(
-                        if (selected) {
-                            MaterialTheme.colorScheme.primary
-                        } else {
-                            Color.Transparent
-                        },
-                    )
-                    .clickable(enabled = enabled && !selected) { onModeChange(option) }
-                    .padding(vertical = Space.sm),
-            ) {
-                Text(
-                    text = label(option),
-                    style = MaterialTheme.typography.labelLarge,
-                    color = if (selected) {
-                        MaterialTheme.colorScheme.onPrimary
-                    } else {
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                    },
-                )
-            }
-        }
-    }
+    SegmentedControl(
+        options = RepostMode.entries.toList(),
+        selected = mode,
+        label = ::label,
+        onSelect = onModeChange,
+        enabled = enabled,
+        modifier = Modifier.padding(top = Space.md),
+    )
     Text(
         text = when (mode) {
             RepostMode.POST -> "Original post. The capture goes with it as the image."
@@ -665,22 +663,23 @@ private fun Composer(
 
 @Composable
 private fun GeneratingRow(mode: RepostMode) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 24.dp),
-        horizontalArrangement = Arrangement.Center,
-        verticalAlignment = Alignment.CenterVertically,
+    Column(
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+        modifier = Modifier.padding(top = 16.dp),
     ) {
-        CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
-        Text(
-            text = when (mode) {
-                RepostMode.POST -> "Writing posts…"
-                RepostMode.QUOTE -> "Writing quote posts…"
-            },
-            style = MaterialTheme.typography.bodyMedium,
-            modifier = Modifier.padding(start = 10.dp),
-        )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            CircularProgressIndicator(modifier = Modifier.size(14.dp), strokeWidth = 2.dp)
+            Text(
+                text = when (mode) {
+                    RepostMode.POST -> "Writing posts…"
+                    RepostMode.QUOTE -> "Writing quote posts…"
+                },
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(start = 10.dp),
+            )
+        }
+        repeat(2) { SkeletonDraftCard() }
     }
 }
 

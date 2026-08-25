@@ -67,8 +67,14 @@ internal fun SeedCard(seed: StoredSeed, onOpen: () -> Unit, onDelete: () -> Unit
         Column(modifier = Modifier.padding(Space.lg)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 ChipRow(seed = seed, modifier = Modifier.weight(1f))
+                // Source and age fold into one quiet line: "reply · 12 h ago".
+                // They are context, not categories, so they do not earn chips.
                 Text(
-                    text = if (seed.isPending) "syncing" else relativeAge(seed.createdAtMillis),
+                    text = if (seed.isPending) {
+                        "${seed.source.label} · syncing"
+                    } else {
+                        "${seed.source.label} · ${relativeAge(seed.createdAtMillis)}"
+                    },
                     style = MetaTextStyle,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -144,6 +150,8 @@ private fun ChipRow(seed: StoredSeed, modifier: Modifier = Modifier) {
         horizontalArrangement = Arrangement.spacedBy(5.dp),
         modifier = modifier.horizontalScroll(rememberScrollState()),
     ) {
+        // Two chips at most. The old row could reach four before the seed text
+        // started, which made every card read as UI before it read as an idea.
         // X is the historical default, so only the marked cases get a chip.
         if (seed.platform != Platform.X) {
             Chip(
@@ -153,18 +161,12 @@ private fun ChipRow(seed: StoredSeed, modifier: Modifier = Modifier) {
             )
         }
         Chip(
-            text = seed.source.label,
-            container = MaterialTheme.colorScheme.primaryContainer,
-            content = MaterialTheme.colorScheme.onPrimaryContainer,
-        )
-        Chip(
             text = seed.status.label,
             container = seed.status.color.copy(alpha = 0.18f),
             content = seed.status.color,
         )
         if (seed.seed.shelfLife.isNotBlank()) {
-            // Outlined rather than filled: it is the least important of the three,
-            // and three filled chips in a row fights for attention.
+            // Outlined rather than filled: the least important, quietest voice.
             Chip(
                 text = seed.seed.shelfLife,
                 container = Color.Transparent,

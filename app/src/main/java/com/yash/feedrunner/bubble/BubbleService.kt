@@ -294,6 +294,15 @@ class BubbleService : Service() {
     }
 
     private fun onBubbleTapped() {
+        // The tap should be felt on the bubble itself: a quick dip and back.
+        bubbleCircle?.animate()
+            ?.scaleX(0.86f)?.scaleY(0.86f)
+            ?.setDuration(80)
+            ?.withEndAction {
+                bubbleCircle?.animate()?.scaleX(1f)?.scaleY(1f)?.setDuration(120)?.start()
+            }
+            ?.start()
+
         val active = autoCapture
         if (active != null) {
             // Tap while auto-capturing = stop and stitch what we have.

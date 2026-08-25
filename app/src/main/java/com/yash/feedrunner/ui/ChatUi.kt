@@ -55,6 +55,7 @@ import com.yash.feedrunner.ui.theme.RoundIconButton
 import com.yash.feedrunner.ui.theme.Space
 import com.yash.feedrunner.ui.theme.Radius
 import com.yash.feedrunner.ui.theme.SoftAccentChip
+import com.yash.feedrunner.ui.theme.pressClickable
 
 /**
  * The follow-up conversation, shared by the reply sheet and the compose sheet.
@@ -252,9 +253,9 @@ private fun AngleChips(angles: List<Angle>, enabled: Boolean, onPick: (Angle) ->
                 fontWeight = FontWeight.SemiBold,
                 color = angle.color.copy(alpha = alpha),
                 modifier = Modifier
+                    .pressClickable(enabled = enabled, pressedScale = 0.94f) { onPick(angle) }
                     .clip(RoundedCornerShape(Radius.chip))
                     .background(angle.color.copy(alpha = 0.16f * alpha))
-                    .clickable(enabled = enabled) { onPick(angle) }
                     .padding(horizontal = Space.md, vertical = Space.sm),
             )
         }
@@ -276,9 +277,9 @@ private fun QuickPrompts(prompts: List<String>, onPick: (String) -> Unit) {
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.primary,
                 modifier = Modifier
+                    .pressClickable(pressedScale = 0.94f) { onPick(prompt) }
                     .clip(RoundedCornerShape(Radius.chip))
                     .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.10f))
-                    .clickable { onPick(prompt) }
                     .padding(horizontal = Space.md, vertical = Space.sm),
             )
         }
