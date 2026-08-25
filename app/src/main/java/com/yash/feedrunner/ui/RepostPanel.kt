@@ -75,6 +75,7 @@ import com.yash.feedrunner.ui.theme.Space
 import com.yash.feedrunner.ui.theme.SoftAccentChip
 import com.yash.feedrunner.ui.theme.Radius
 import com.yash.feedrunner.ui.theme.HairlineCard
+import com.yash.feedrunner.ui.theme.WordLimitSlider
 
 private val SheetShape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp)
 
@@ -95,6 +96,8 @@ fun RepostPanel(
     userText: String,
     onModeChange: (RepostMode) -> Unit,
     onUserTextChange: (String) -> Unit,
+    wordLimit: Int,
+    onWordLimit: (Int) -> Unit,
     onGenerate: () -> Unit,
     onCopyText: (String) -> Unit,
     onCopyDraft: (PostDraft) -> Unit,
@@ -254,6 +257,8 @@ fun RepostPanel(
                             userText = userText,
                             enabled = state !is RepostState.Loading,
                             autoFocus = state is RepostState.Composing,
+                            wordLimit = wordLimit,
+                            onWordLimit = onWordLimit,
                             onUserTextChange = onUserTextChange,
                             onFocusChanged = trackFocus,
                             onGenerate = onGenerate,
@@ -564,6 +569,8 @@ private fun Composer(
     userText: String,
     enabled: Boolean,
     autoFocus: Boolean,
+    wordLimit: Int,
+    onWordLimit: (Int) -> Unit,
     onUserTextChange: (String) -> Unit,
     onFocusChanged: (Boolean) -> Unit,
     onGenerate: () -> Unit,
@@ -636,6 +643,15 @@ private fun Composer(
                 )
             }
         }
+
+        // Posts run longer than replies, so this slider gets a longer leash.
+        WordLimitSlider(
+            value = wordLimit,
+            range = 20..150,
+            step = 10,
+            onValueChange = onWordLimit,
+            modifier = Modifier.padding(top = Space.md),
+        )
 
         Surface(
             shape = RoundedCornerShape(Radius.control),

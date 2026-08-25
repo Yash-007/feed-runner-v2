@@ -81,6 +81,7 @@ import com.yash.feedrunner.ui.theme.Radius
 import com.yash.feedrunner.ui.theme.Space
 import com.yash.feedrunner.ui.theme.pressClickable
 import com.yash.feedrunner.ui.theme.shimmer
+import com.yash.feedrunner.ui.theme.WordLimitSlider
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.slideInVertically
@@ -101,6 +102,8 @@ fun ReplyPanel(
     onAngleBatch: (Angle) -> Unit,
     onCopyText: (String) -> Unit,
     onChatFocusChanged: (Boolean) -> Unit,
+    wordLimit: Int,
+    onWordLimit: (Int) -> Unit,
     onRetry: () -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -177,6 +180,8 @@ fun ReplyPanel(
                     is PanelState.Error -> ErrorBody(state.message, onRetry)
                     is PanelState.Ready -> ReadyBody(
                         state = state,
+                        wordLimit = wordLimit,
+                        onWordLimit = onWordLimit,
                         onDraftCopy = onDraftCopy,
                         onToggleUsed = onToggleUsed,
                         onRefine = onRefine,
@@ -370,6 +375,8 @@ private fun ErrorBody(message: String, onRetry: () -> Unit) {
 @Composable
 private fun ReadyBody(
     state: PanelState.Ready,
+    wordLimit: Int,
+    onWordLimit: (Int) -> Unit,
     onDraftCopy: (Draft) -> Unit,
     onToggleUsed: (Draft) -> Unit,
     onRefine: (Draft, Refinement) -> Unit,
@@ -465,6 +472,15 @@ private fun ReadyBody(
                     )
                 }
             }
+
+            // The cap steers everything generated from here on: angle batches,
+            // chat answers, refinements, and the next capture.
+            WordLimitSlider(
+                value = wordLimit,
+                range = 10..60,
+                step = 5,
+                onValueChange = onWordLimit,
+            )
 
             ChatComposer(
                 pending = state.chatPending,

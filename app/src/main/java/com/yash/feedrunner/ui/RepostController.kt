@@ -24,6 +24,7 @@ import com.yash.feedrunner.data.DraftPick
 import com.yash.feedrunner.data.IdeaBankRepository
 import com.yash.feedrunner.data.RepostStore
 import com.yash.feedrunner.data.VoiceRulesStore
+import com.yash.feedrunner.data.WordLimitStore
 import java.io.File
 import java.util.concurrent.Executors
 import com.yash.feedrunner.ui.theme.FeedRunnerTheme
@@ -46,6 +47,7 @@ class RepostController(
     private val worker = Executors.newSingleThreadExecutor()
     private val window = OverlayWindow(context, windowManager)
     private val voiceRulesStore = VoiceRulesStore(context)
+    private val wordLimits = WordLimitStore(context)
     private val store = RepostStore(context)
     private val ideaBank = IdeaBankRepository(context)
     private val captureDir = File(context.filesDir, "repost").apply { mkdirs() }
@@ -58,6 +60,9 @@ class RepostController(
     /** Platform of the current capture; drives the prompt and the labels. */
     private var platform by mutableStateOf(Platform.X)
     private var userText by mutableStateOf("")
+
+    /** The post word cap, mirrored into state so the slider follows edits. */
+    private var postLimit by mutableStateOf(0)
     private var capturePath by mutableStateOf<String?>(null)
 
     /**
@@ -123,6 +128,7 @@ class RepostController(
     }
 
     private fun open() {
+        postLimit = wordLimits.postLimit
         window.show(gravity = Gravity.BOTTOM) {
             FeedRunnerTheme {
                 RepostPanel(
@@ -133,6 +139,11 @@ class RepostController(
                     userText = userText,
                     onModeChange = { mode = it },
                     onUserTextChange = { userText = it },
+                    wordLimit = postLimit,
+                    onWordLimit = { limit ->
+                        postLimit = limit
+                        wordLimits.postLimit = limit
+                    },
                     onGenerate = ::generate,
                     onCopyText = ::copyText,
                     onCopyDraft = ::copyDraft,
@@ -172,7 +183,10 @@ class RepostController(
                 val bitmap = decodeScaledForApi(path)
                     ?: throw ClaudeException("Could not read the capture. Try again.")
                 val segments = ImagePrep.toBase64Segments(bitmap)
-                client.suggestPosts(requestedMode, segments, text, voiceRules, requestPlatform)
+                client.suggestPosts(
+                    requestedMode, segments, text, voiceRules, requestPlatform,
+                    wordLimit = wordLimits.postLimit,
+                )
             }
 
             handler.post {
@@ -257,6 +271,7 @@ class RepostController(
                     history = history,
                     userMessage = message,
                     extraVoiceRules = voiceRules,
+                    wordLimit = wordLimits.postLimit,
                 )
             }
 

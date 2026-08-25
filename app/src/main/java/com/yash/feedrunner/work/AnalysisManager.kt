@@ -14,6 +14,7 @@ import com.yash.feedrunner.api.ImagePrep
 import com.yash.feedrunner.data.IdeaBankRepository
 import com.yash.feedrunner.data.ResultStore
 import com.yash.feedrunner.data.VoiceRulesStore
+import com.yash.feedrunner.data.WordLimitStore
 import com.yash.feedrunner.ui.Platform
 import com.yash.feedrunner.ui.SeedSource
 import java.util.concurrent.Executors
@@ -48,6 +49,7 @@ class AnalysisManager(
     private val pool = Executors.newFixedThreadPool(MAX_PARALLEL)
     private val handler = Handler(Looper.getMainLooper())
     private val voiceRulesStore = VoiceRulesStore(context)
+    private val wordLimits = WordLimitStore(context)
     private val running = AtomicInteger(0)
     private var nextJobId = 1L
 
@@ -81,7 +83,7 @@ class AnalysisManager(
             val voiceRules = voiceRulesStore.rules
             val outcome = runCatching {
                 val segments = ImagePrep.toBase64Segments(screenshot)
-                val analysis = client.analyze(segments, voiceRules, platform)
+                val analysis = client.analyze(segments, voiceRules, platform, wordLimits.replyLimit)
                 val saved = resultStore.save(
                     postContext = analysis.postContext,
                     drafts = analysis.drafts,

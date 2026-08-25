@@ -72,11 +72,13 @@ class CopilotApi(private val transport: IdeaBankApi) {
         imageSegments: List<String>,
         extraVoiceRules: String,
         platform: Platform,
+        wordLimit: Int = 0,
     ): Analysis {
         val payload = JSONObject()
             .put("platform", platform.wire)
             .put("images", JSONArray(imageSegments))
             .put("voice_rules", extraVoiceRules)
+            .withWordLimit(wordLimit)
         return parseAnalysis(call("/copilot/replies", payload))
     }
 
@@ -86,6 +88,7 @@ class CopilotApi(private val transport: IdeaBankApi) {
         existing: List<Draft>,
         extraVoiceRules: String,
         platform: Platform,
+        wordLimit: Int = 0,
     ): List<Draft> {
         val payload = JSONObject()
             .put("platform", platform.wire)
@@ -93,6 +96,7 @@ class CopilotApi(private val transport: IdeaBankApi) {
             .put("post_context", postContext.toJson())
             .put("existing", JSONArray(existing.map { it.toJson() }))
             .put("voice_rules", extraVoiceRules)
+            .withWordLimit(wordLimit)
 
         val body = call("/copilot/replies/angle", payload)
         // The angle was fixed by the request, so it is not read back.
@@ -105,6 +109,7 @@ class CopilotApi(private val transport: IdeaBankApi) {
         postContext: PostContext,
         extraVoiceRules: String,
         platform: Platform,
+        wordLimit: Int = 0,
     ): String {
         val payload = JSONObject()
             .put("platform", platform.wire)
@@ -113,6 +118,7 @@ class CopilotApi(private val transport: IdeaBankApi) {
             .put("instruction", refinement.instruction)
             .put("post_context", postContext.toJson())
             .put("voice_rules", extraVoiceRules)
+            .withWordLimit(wordLimit)
 
         return call("/copilot/replies/refine", payload).requireText()
     }
@@ -124,6 +130,7 @@ class CopilotApi(private val transport: IdeaBankApi) {
         userMessage: String,
         extraVoiceRules: String,
         platform: Platform,
+        wordLimit: Int = 0,
     ): String {
         val payload = JSONObject()
             .put("platform", platform.wire)
@@ -132,6 +139,7 @@ class CopilotApi(private val transport: IdeaBankApi) {
             .put("history", history.toJson())
             .put("message", userMessage)
             .put("voice_rules", extraVoiceRules)
+            .withWordLimit(wordLimit)
 
         return call("/copilot/replies/chat", payload).requireText()
     }
@@ -142,6 +150,7 @@ class CopilotApi(private val transport: IdeaBankApi) {
         userText: String,
         extraVoiceRules: String,
         platform: Platform,
+        wordLimit: Int = 0,
     ): RepostAnalysis {
         val payload = JSONObject()
             .put("platform", platform.wire)
@@ -149,6 +158,7 @@ class CopilotApi(private val transport: IdeaBankApi) {
             .put("images", JSONArray(imageSegments))
             .put("user_text", userText)
             .put("voice_rules", extraVoiceRules)
+            .withWordLimit(wordLimit)
 
         return parseRepost(call("/copilot/posts", payload))
     }
@@ -161,6 +171,7 @@ class CopilotApi(private val transport: IdeaBankApi) {
         userMessage: String,
         extraVoiceRules: String,
         platform: Platform,
+        wordLimit: Int = 0,
     ): String {
         val payload = JSONObject()
             .put("platform", platform.wire)
@@ -170,6 +181,7 @@ class CopilotApi(private val transport: IdeaBankApi) {
             .put("history", history.toJson())
             .put("message", userMessage)
             .put("voice_rules", extraVoiceRules)
+            .withWordLimit(wordLimit)
 
         return call("/copilot/posts/chat", payload).requireText()
     }
@@ -177,6 +189,10 @@ class CopilotApi(private val transport: IdeaBankApi) {
     private companion object {
         const val TAG = "Copilot"
     }
+
+    /** Zero means no cap and stays off the wire, matching older servers. */
+    private fun JSONObject.withWordLimit(limit: Int): JSONObject =
+        if (limit > 0) put("word_limit", limit) else this
 
     private fun JSONObject.requireText(): String =
         optString("text").trim().ifEmpty {

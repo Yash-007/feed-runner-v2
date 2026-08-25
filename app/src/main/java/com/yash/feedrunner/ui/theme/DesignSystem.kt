@@ -11,6 +11,8 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
@@ -28,9 +30,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.input.pointer.pointerInput
+import kotlin.math.roundToInt
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -223,6 +228,147 @@ fun <T> SegmentedControl(
 }
 
 private val SegmentHeight = 34.dp
+
+/**
+ * The length slider: how many words a draft may spend.
+ *
+ * Drawn by hand rather than themed from Material so it matches the rest of the
+ * system: a hairline track, an evergreen fill, a white thumb that gives under
+ * the finger. Snaps to [step]-word notches with a haptic tick; the notch past
+ * the top is "auto", meaning no cap, which is also the default. Left is tight,
+ * right is free.
+ */
+@Composable
+fun WordLimitSlider(
+    /** The stored cap. 0 means auto (no cap). */
+    value: Int,
+    range: IntRange,
+    step: Int,
+    onValueChange: (Int) -> Unit,
+    modifier: Modifier = Modifier,
+    label: String = "length",
+) {
+    val autoNotch = range.last + step
+    val current = if (value <= 0) autoNotch else value.coerceIn(range.first, range.last)
+    val span = (autoNotch - range.first).toFloat()
+    val haptics = androidx.compose.ui.platform.LocalHapticFeedback.current
+    // Read inside the gesture handlers without restarting them: keying the
+    // pointerInput on the value would abort a drag at its first notch.
+    val liveNotch = androidx.compose.runtime.rememberUpdatedState(current)
+    val liveOnChange = androidx.compose.runtime.rememberUpdatedState(onValueChange)
+
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = modifier.fillMaxWidth(),
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+
+        BoxWithConstraints(
+            contentAlignment = Alignment.CenterStart,
+            modifier = Modifier
+                .weight(1f)
+                .padding(horizontal = Space.md)
+                .height(SliderTouchHeight)
+                .pointerInput(range, step) {
+                    // One lambda for tap and drag: both are "the finger says here".
+                    fun settle(x: Float) {
+                        val fraction = (x / size.width.toFloat()).coerceIn(0f, 1f)
+                        val raw = range.first + fraction * span
+                        val notch = (range.first +
+                            ((raw - range.first) / step).roundToInt() * step)
+                            .coerceIn(range.first, autoNotch)
+                        if (notch != liveNotch.value) {
+                            haptics.performHapticFeedback(
+                                androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove,
+                            )
+                            liveOnChange.value(if (notch >= autoNotch) 0 else notch)
+                        }
+                    }
+                    detectHorizontalDragGestures(
+                        onDragStart = { offset -> settle(offset.x) },
+                    ) { change, _ ->
+                        change.consume()
+                        settle(change.position.x)
+                    }
+                }
+                .pointerInput(range, step) {
+                    detectTapGestures { offset ->
+                        val fraction = (offset.x / size.width.toFloat()).coerceIn(0f, 1f)
+                        val raw = range.first + fraction * span
+                        val notch = (range.first +
+                            ((raw - range.first) / step).roundToInt() * step)
+                            .coerceIn(range.first, autoNotch)
+                        liveOnChange.value(if (notch >= autoNotch) 0 else notch)
+                    }
+                },
+        ) {
+            val fraction = (current - range.first) / span
+            val thumbCenter = SliderThumb / 2 + (maxWidth - SliderThumb) * fraction
+
+            // Track: the same hairline grammar as every border in the app.
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(SliderTrack)
+                    .clip(RoundedCornerShape(SliderTrack / 2))
+                    .background(MaterialTheme.colorScheme.outlineVariant),
+            )
+            // Fill: evergreen, brightening toward the thumb.
+            Box(
+                modifier = Modifier
+                    .width(thumbCenter)
+                    .height(SliderTrack)
+                    .clip(RoundedCornerShape(SliderTrack / 2))
+                    .background(
+                        Brush.horizontalGradient(
+                            listOf(
+                                MaterialTheme.colorScheme.primary.copy(alpha = 0.45f),
+                                MaterialTheme.colorScheme.primary,
+                            ),
+                        ),
+                    ),
+            )
+            val animatedOffset by animateDpAsState(
+                targetValue = thumbCenter - SliderThumb / 2,
+                animationSpec = Motion.settle(),
+                label = "sliderThumb",
+            )
+            Box(
+                modifier = Modifier
+                    .offset(x = animatedOffset)
+                    .size(SliderThumb)
+                    .clip(RoundedCornerShape(SliderThumb / 2))
+                    .background(MaterialTheme.colorScheme.surface)
+                    .border(
+                        1.5.dp,
+                        MaterialTheme.colorScheme.primary,
+                        RoundedCornerShape(SliderThumb / 2),
+                    ),
+            )
+        }
+
+        // The readout doubles as the "auto" explainer: no cap unless you set one.
+        Text(
+            text = if (current >= autoNotch) "auto" else "≤ $current words",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.primary,
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+            modifier = Modifier
+                .widthIn(min = 78.dp)
+                .clip(RoundedCornerShape(Radius.chip))
+                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.10f))
+                .padding(horizontal = Space.sm, vertical = Space.xs),
+        )
+    }
+}
+
+private val SliderTouchHeight = 30.dp
+private val SliderTrack = 4.dp
+private val SliderThumb = 18.dp
 
 /**
  * The loading texture: a soft band of the primary drifting across a pale block.

@@ -25,6 +25,7 @@ import com.yash.feedrunner.data.DraftPick
 import com.yash.feedrunner.data.ResultStore
 import com.yash.feedrunner.work.AnalysisManager
 import com.yash.feedrunner.data.VoiceRulesStore
+import com.yash.feedrunner.data.WordLimitStore
 import java.util.concurrent.Executors
 import com.yash.feedrunner.ui.theme.FeedRunnerTheme
 
@@ -46,12 +47,16 @@ class PanelController(
     private val worker = Executors.newSingleThreadExecutor()
     private val window = OverlayWindow(context, windowManager)
     private val voiceRulesStore = VoiceRulesStore(context)
+    private val wordLimits = WordLimitStore(context)
     private val readState = ReadState(context)
     private val ideaBank = IdeaBankRepository(context)
 
     private val claude: CopilotApi by lazy { CopilotApi(IdeaBankApi(BackendConfig(context))) }
 
     private var state by mutableStateOf<PanelState>(PanelState.Loading)
+
+    /** The reply word cap, mirrored into state so the slider follows edits. */
+    private var replyLimit by mutableStateOf(0)
 
     /**
      * The analysis job this panel is currently displaying, if any. The job keeps
@@ -174,6 +179,7 @@ class PanelController(
 
     private fun openWindow() {
         generation++
+        replyLimit = wordLimits.replyLimit
         state = PanelState.Loading
         window.show(gravity = Gravity.BOTTOM) {
             FeedRunnerTheme {
@@ -188,12 +194,20 @@ class PanelController(
                     onAngleBatch = ::moreInAngle,
                     onCopyText = ::copyText,
                     onChatFocusChanged = window::setFocusable,
+                    wordLimit = replyLimit,
+                    onWordLimit = ::setWordLimit,
                     onRetry = ::dismiss,
                     onDismiss = ::dismiss,
                 )
             }
         }
         onVisibilityChanged(true)
+    }
+
+    /** Persisted immediately: the cap applies to the next capture too. */
+    private fun setWordLimit(limit: Int) {
+        replyLimit = limit
+        wordLimits.replyLimit = limit
     }
 
     private fun refineDraft(draft: Draft, refinement: Refinement) {
@@ -214,6 +228,7 @@ class PanelController(
                     postContext = activeContext,
                     extraVoiceRules = voiceRules,
                     platform = requestPlatform,
+                    wordLimit = wordLimits.replyLimit,
                 )
             }
 
@@ -267,6 +282,7 @@ class PanelController(
                     userMessage = message,
                     extraVoiceRules = voiceRules,
                     platform = requestPlatform,
+                    wordLimit = wordLimits.replyLimit,
                 )
             }
 
@@ -330,7 +346,10 @@ class PanelController(
 
         worker.execute {
             val outcome = runCatching {
-                client.repliesInAngle(angle, activeContext, drafts, voiceRules, requestPlatform)
+                client.repliesInAngle(
+                    angle, activeContext, drafts, voiceRules, requestPlatform,
+                    wordLimit = wordLimits.replyLimit,
+                )
             }
 
             handler.post {
