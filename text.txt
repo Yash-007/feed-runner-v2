@@ -84,6 +84,10 @@ Design decisions, made up front:
 
 
 some more additions from my side
-- pls change the purple color from the theme to some other color which looks good. which looks naturally good. purple makes it look too ai generated app.
-- also add the dark mode feature in the app.
+- [x] pls change the purple color from the theme to some other color which looks good. which looks naturally good. purple makes it look too ai generated app.
+      -> evergreen (#0E7A55 light / mint dark), bubble gradient matched
+- [x] also add the dark mode feature in the app.
+      -> Appearance card on setup: System / Light / Dark, followed by the
+         overlay panels too since they share FeedRunnerTheme
 - after completion. try this on linkedin app on my device and see how its working and check if there's some changes need to be make like while capturing the screen, ui, ux or any other.
+- add a general tab as well for the generic queries and also add the same feature and prompt so user can make the generice queries as well.

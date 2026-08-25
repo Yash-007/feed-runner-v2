@@ -39,6 +39,10 @@ import com.yash.feedrunner.bubble.BubbleService
 import com.yash.feedrunner.ui.ideas.IdeasActivity
 import com.yash.feedrunner.capture.CaptureService
 import com.yash.feedrunner.data.VoiceRulesStore
+import androidx.compose.foundation.border
+import androidx.compose.ui.graphics.Color
+import com.yash.feedrunner.ui.theme.ThemeMode
+import com.yash.feedrunner.ui.theme.ThemePreference
 import com.yash.feedrunner.ui.theme.FeedRunnerTheme
 import com.yash.feedrunner.ui.theme.WashHeader
 import com.yash.feedrunner.ui.theme.Space
@@ -226,6 +230,67 @@ class MainActivity : ComponentActivity() {
                                                 )
                                             },
                                         )
+                                    }
+                                }
+                            }
+                        }
+
+                        HairlineCard {
+                            Column(modifier = Modifier.padding(Space.lg)) {
+                                Text(
+                                    text = "Appearance",
+                                    style = MaterialTheme.typography.titleMedium,
+                                )
+                                Text(
+                                    text = "The overlays follow this too, so pin Dark if " +
+                                        "you mostly scroll at night.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(top = Space.xs),
+                                )
+                                val trackShape = RoundedCornerShape(Radius.control)
+                                val current = ThemePreference.mode.value
+                                Row(
+                                    modifier = Modifier
+                                        .padding(top = Space.md)
+                                        .fillMaxWidth()
+                                        .clip(trackShape)
+                                        .border(
+                                            Space.hair,
+                                            MaterialTheme.colorScheme.outlineVariant,
+                                            trackShape,
+                                        )
+                                        .padding(Space.xs),
+                                ) {
+                                    ThemeMode.entries.forEach { option ->
+                                        val selected = option == current
+                                        Box(
+                                            contentAlignment = Alignment.Center,
+                                            modifier = Modifier
+                                                .weight(1f)
+                                                .clip(RoundedCornerShape(Radius.chip))
+                                                .background(
+                                                    if (selected) {
+                                                        MaterialTheme.colorScheme.primary
+                                                    } else {
+                                                        Color.Transparent
+                                                    },
+                                                )
+                                                .clickable(enabled = !selected) {
+                                                    ThemePreference.set(this@MainActivity, option)
+                                                }
+                                                .padding(vertical = Space.sm),
+                                        ) {
+                                            Text(
+                                                text = option.label,
+                                                style = MaterialTheme.typography.labelLarge,
+                                                color = if (selected) {
+                                                    MaterialTheme.colorScheme.onPrimary
+                                                } else {
+                                                    MaterialTheme.colorScheme.onSurfaceVariant
+                                                },
+                                            )
+                                        }
                                     }
                                 }
                             }

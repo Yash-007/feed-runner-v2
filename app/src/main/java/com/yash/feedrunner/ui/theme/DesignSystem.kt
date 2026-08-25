@@ -3,7 +3,6 @@ package com.yash.feedrunner.ui.theme
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -100,7 +99,7 @@ private val DarkWash = listOf(
  */
 @Composable
 internal fun washBrush(): Brush = Brush.linearGradient(
-    colors = if (isSystemInDarkTheme()) DarkWash else LightWash,
+    colors = if (appInDarkTheme()) DarkWash else LightWash,
     start = Offset.Zero,
     end = Offset(Float.POSITIVE_INFINITY, Float.POSITIVE_INFINITY),
 )
@@ -118,7 +117,7 @@ internal fun Modifier.halftone(
     dotRadius: Dp = 0.7.dp,
 ): Modifier {
     val density = LocalDensity.current
-    val dark = isSystemInDarkTheme()
+    val dark = appInDarkTheme()
     // White dots lift a pastel ground; on a dark ground they have to be darker
     // than it or the texture turns into static.
     val dotColor = if (dark) Color.Black.copy(alpha = 0.30f) else Color.White.copy(alpha = 0.55f)
