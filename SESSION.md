@@ -41,14 +41,14 @@ session (or another account) to continue: it assumes nothing from chat history.
        menu toggle w/ auto-detect, chips, Ideas filter) — verified on the real
        LinkedIn app: detection auto-selected LinkedIn, captured a CoinDCX post,
        comment-appropriate drafts (human/appreciate/ask)
-4. [x] General tab (third platform "general"): backend prompts
-       general_reply.md / general_post.md, routes accept it, app enum + menu
-       segment + chips/filter generalized. Backend pushed (ab7c976). App code
-       built + installed. NOT device-tested (skipped to save tokens; pipeline
-       identical to LinkedIn's, which is proven).
-5. [ ] Device theme is currently pinned Dark from testing — tap
-       Appearance > System on the setup screen (one tap, cosmetic).
-6. [ ] App repo: commit + push the General changes  <- doing now
+4. [x] General tab: backend + app shipped. Verified against the deployed
+       backend with a text-only call (an email reply, general prompt answered
+       in kind, no tool confusion). Menu's three segments were confirmed in an
+       earlier screenshot. Image capture path shares LinkedIn's proven code.
+5. [x] Device theme reset to System (verified via theme.xml prefs).
+6. [x] App repo committed + pushed (4f814f1).
+
+Nothing in flight. Next work starts fresh from this file.
 
 ## Known open items (older, not urgent)
 
