@@ -96,13 +96,17 @@ Ideas. X flow regression OK (Last result opens, saved strip works).
   change). Absent/0 = no cap, old servers ignore the field.
 - Verified on device: render, drag-snap, tap-to-set, auto reset. Committed +
   pushed: app 0e1632c, backend e8d3d5a (Render auto-deploy).
+- Live E2E after deploy: /copilot/replies/chat with word_limit=8 answered in
+  6 words; same request uncapped answered in 15. Cap reaches the model.
+- Side find: local.properties had a mangled line gluing the dead
+  anthropic.apiKey to "ideaBank.token=localdevtoken", so `grep ideaBank.token`
+  matched two lines and curl sent a broken auth header (HTTP 000 / empty
+  reply). Line deleted; grep with `^ideaBank.token=` from now on.
 
 Nothing in flight. Next work starts fresh from this file.
 
 ## Known open items (older, not urgent)
 
-- local.properties anthropic.apiKey is INVALID (on-device drafting was dead
-  before the server move; harmless now, key unused, can be deleted).
 - Rotate: the GitHub PAT in both repos' remotes, and ideally the Atlas
   password / scoped user (URI grants access to 15 unrelated DBs).
 - Render free tier: 2/8 test calls hung >150s once; server-side timeout on
