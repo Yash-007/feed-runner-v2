@@ -220,6 +220,11 @@ Verified after deploy: probe_test login OK (same token), signup validation
 answers (not 403, code unset), 153 seeds + 89/10 streak intact through the
 index migration. Release APK with invite field installed on device.
 
+- Late catch (a9cc5fb): release builds ship IDEA_BANK_TOKEN as "" — the
+  shared bearer no longer travels in the published APK (verified absent from
+  classes.dex). Release relies wholly on the session token behind the auth
+  gate. Debug builds keep the token for adb work.
+
 Nothing in flight. Next work starts fresh from this file.
 
 ## Known open items (older, not urgent)
