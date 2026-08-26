@@ -175,6 +175,21 @@ Ideas. X flow regression OK (Last result opens, saved strip works).
   streak cache, prefs) still single-namespace per phone.
 - Shortened close-me hint APK (d86a86d) installed on device this round.
 
+## Seventh round (2026-08-26): perf pass — done
+
+- Root cause of "app feels slow": debug builds. Release variant now = R8 +
+  shrinkResources + debug signing (2.7MB vs 49MB); THE PHONE RUNS RELEASE NOW
+  — install app/build/outputs/apk/release/app-release.apk from here on.
+  proguard-rules.pro keeps enum valueOf names (server strings -> enums).
+- Main-thread disk I/O removed: bubble-menu open (MenuController age line),
+  PanelController showLastResult/selectResult/showFinished, and the unread
+  badge count all parsed results.json on main; all on workers now, UI shows
+  first and data fills in. Menu "Last result" row stays tappable while age
+  loads ("…" placeholder; empty store answers with the toast).
+- Verified R8 build on device: auth renders, probe_test login works, Ideas
+  shows probe's EMPTY bank (scoping visible on device), cold start 1.6s /
+  warm 0. Signed out after; device back at the sign-in screen.
+
 Nothing in flight. Next work starts fresh from this file.
 
 ## Known open items (older, not urgent)
