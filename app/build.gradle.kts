@@ -34,7 +34,17 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            // R8 + resource shrinking: debug Compose is visibly janky (runtime
+            // checks, no optimizing ART), so the phone runs this variant.
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro",
+            )
+            // Personal side-project: debug-signed release installs over adb
+            // without a keystore ceremony.
+            signingConfig = signingConfigs.getByName("debug")
         }
     }
 

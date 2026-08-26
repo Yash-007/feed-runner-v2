@@ -1,6 +1,8 @@
 package com.yash.feedrunner.ui
 
 import android.content.Context
+import android.os.Handler
+import android.os.Looper
 import android.view.WindowManager
 import com.yash.feedrunner.data.ResultStore
 import androidx.compose.runtime.getValue
@@ -8,6 +10,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import com.yash.feedrunner.ui.theme.FeedRunnerTheme
+import java.util.concurrent.Executors
 
 /** Shows the three-action menu that fans out from the bubble. */
 class MenuController(
@@ -23,15 +26,26 @@ class MenuController(
     private val onPlatformChosen: (Platform) -> Unit,
 ) {
     private val window = OverlayWindow(context, windowManager)
+    private val handler = Handler(Looper.getMainLooper())
+    private val worker = Executors.newSingleThreadExecutor()
 
     val isShowing: Boolean get() = window.isShowing
 
     fun show(anchor: MenuAnchor, initialPlatform: Platform) {
-        val saved = resultStore.loadAll()
-        val lastAge = saved.firstOrNull()?.let { newest ->
-            val age = relativeAge(newest.savedAtMillis)
-            if (saved.size > 1) "$age · ${saved.size} saved" else age
+        // The subtitle needs a file read and a JSON parse, which used to run
+        // right here on the main thread: every bubble tap paid for it before
+        // the menu could draw. The menu opens now; the age fills in a beat
+        // later, which nobody can see because the rows animate in anyway.
+        val lastAgeState = mutableStateOf<String?>(null)
+        worker.execute {
+            val saved = resultStore.loadAll()
+            val lastAge = saved.firstOrNull()?.let { newest ->
+                val age = relativeAge(newest.savedAtMillis)
+                if (saved.size > 1) "$age · ${saved.size} saved" else age
+            }
+            handler.post { lastAgeState.value = lastAge }
         }
+
         window.show {
             FeedRunnerTheme {
                 // Hoisted here so the toggle survives recomposition of the menu.
@@ -39,7 +53,7 @@ class MenuController(
                 ActionMenu(
                     anchor = anchor,
                     platform = platform,
-                    lastResultAge = lastAge,
+                    lastResultAge = lastAgeState.value,
                     repostDraftsAge = repostDraftsAge(),
                     onPlatform = { chosen ->
                         platform = chosen

@@ -450,16 +450,26 @@ class BubbleService : Service() {
      */
     /** Counts results saved since the last one you opened. */
     private fun refreshUnreadBadge() {
-        val badge = bubbleBadge ?: return
+        if (bubbleBadge == null) return
         val watermark = readState.lastViewedAt
-        val unread = resultStore.loadAll().count { it.savedAtMillis > watermark }
-        if (unread == 0) {
-            badge.visibility = View.GONE
-        } else {
-            badge.text = if (unread > 9) "9+" else unread.toString()
-            badge.visibility = View.VISIBLE
+        // The count needs the results file parsed; off the main thread, because
+        // this runs right after taps and analysis updates, where a stutter shows.
+        badgeWorker.execute {
+            val unread = resultStore.loadAll().count { it.savedAtMillis > watermark }
+            mainHandler.post {
+                val badge = bubbleBadge ?: return@post
+                if (unread == 0) {
+                    badge.visibility = View.GONE
+                } else {
+                    badge.text = if (unread > 9) "9+" else unread.toString()
+                    badge.visibility = View.VISIBLE
+                }
+            }
         }
     }
+
+    private val badgeWorker = java.util.concurrent.Executors.newSingleThreadExecutor()
+    private val mainHandler = android.os.Handler(android.os.Looper.getMainLooper())
 
     private fun refreshBubbleBadge() {
         val circle = bubbleCircle ?: return

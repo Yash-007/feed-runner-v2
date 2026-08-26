@@ -202,12 +202,14 @@ fun ActionMenu(
                         onClick = onRepost,
                     )
                     Hairline(modifier = Modifier.padding(horizontal = Space.md))
+                    // The age loads off-thread and lands a beat after the menu;
+                    // the row stays tappable meanwhile, and a genuinely empty
+                    // store answers the tap with a toast instead of a dead row.
                     MenuRow(
                         glyph = "↺",
                         accent = Accent.lastResult,
                         title = "Last result",
-                        subtitle = lastResultAge ?: "nothing yet",
-                        enabled = lastResultAge != null,
+                        subtitle = lastResultAge ?: "…",
                         onClick = onLastResult,
                     )
                 }

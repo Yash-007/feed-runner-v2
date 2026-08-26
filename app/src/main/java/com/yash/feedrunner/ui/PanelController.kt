@@ -101,20 +101,26 @@ class PanelController(
 
     /** Shows a just-finished analysis, without the "saved result" framing. */
     fun showFinished(resultId: Long) {
-        val stored = resultStore.load(resultId) ?: return
         watchedJobId = null
-        readState.markViewed(stored.savedAtMillis)
-        postContext = stored.postContext
-        platform = stored.platform
-        currentResultId = stored.savedAtMillis
-        state = PanelState.Ready(
-            platform = stored.platform,
-            postContext = stored.postContext,
-            drafts = stored.drafts,
-            thumbnailPath = stored.thumbnailPath,
-            capturePath = stored.capturePath,
-            chat = stored.chat,
-        )
+        val requestGeneration = generation
+        worker.execute {
+            val stored = resultStore.load(resultId)
+            handler.post {
+                if (stored == null || generation != requestGeneration) return@post
+                readState.markViewed(stored.savedAtMillis)
+                postContext = stored.postContext
+                platform = stored.platform
+                currentResultId = stored.savedAtMillis
+                state = PanelState.Ready(
+                    platform = stored.platform,
+                    postContext = stored.postContext,
+                    drafts = stored.drafts,
+                    thumbnailPath = stored.thumbnailPath,
+                    capturePath = stored.capturePath,
+                    chat = stored.chat,
+                )
+            }
+        }
     }
 
     fun showFailure(message: String) {
@@ -122,23 +128,43 @@ class PanelController(
         state = PanelState.Error(message)
     }
 
-    /** Reopens the most recent stored result — no capture, no API call. */
+    /**
+     * Reopens the most recent stored result — no capture, no API call.
+     *
+     * The sheet opens on its skeleton immediately; the file read and JSON parse
+     * that used to block the tap happen behind it. An empty store closes the
+     * sheet again with a toast, which is rare enough not to design further.
+     */
     fun showLastResult() {
-        val all = resultStore.loadAll()
-        val newest = all.firstOrNull()
-        if (newest == null) {
-            Toast.makeText(context, "No saved results yet", Toast.LENGTH_SHORT).show()
-            return
-        }
         openWindow()
-        showStored(newest, all)
+        val requestGeneration = generation
+        worker.execute {
+            val all = resultStore.loadAll()
+            handler.post {
+                if (generation != requestGeneration) return@post
+                val newest = all.firstOrNull()
+                if (newest == null) {
+                    Toast.makeText(context, "No saved results yet", Toast.LENGTH_SHORT).show()
+                    dismiss()
+                } else {
+                    showStored(newest, all)
+                }
+            }
+        }
     }
 
     /** Switches the open panel to another stored result. Still no API call. */
     private fun selectResult(savedAtMillis: Long) {
-        val all = resultStore.loadAll()
-        val target = all.firstOrNull { it.savedAtMillis == savedAtMillis } ?: return
-        showStored(target, all)
+        val requestGeneration = generation
+        worker.execute {
+            val all = resultStore.loadAll()
+            handler.post {
+                if (generation != requestGeneration) return@post
+                val target = all.firstOrNull { it.savedAtMillis == savedAtMillis }
+                    ?: return@post
+                showStored(target, all)
+            }
+        }
     }
 
     private fun showStored(target: StoredResult, all: List<StoredResult>) {
