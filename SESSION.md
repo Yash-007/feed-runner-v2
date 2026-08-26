@@ -276,6 +276,16 @@ index migration. Release APK with invite field installed on device.
   for networks with nothing saved render dimmed (optionDimmed slot on
   SegmentedControl; availability from Ready.history). Verified on device.
 
+## APK sharing (2026-08-26)
+
+- Shareable build at ~/Desktop/FeedRunner-0.1.apk (debug-signed release; future
+  shared updates must be built on this Mac or friends reinstall).
+- Invite-code flow REMOVED at Yash's call (backend 437ecb1, app 85cf2b6):
+  signup is open again; auth rate limit (20/min/IP) stays as the only guard.
+  SIGNUP_CODE env no longer read — nothing to set on Render. Accepted risk:
+  anyone with the URL can create an account and spend the Anthropic key.
+- Bubble left running on device; phone has the same build as the Desktop APK.
+
 Nothing in flight. Next work starts fresh from this file.
 
 ## Known open items (older, not urgent)
