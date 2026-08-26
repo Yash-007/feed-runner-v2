@@ -163,6 +163,11 @@ fun <T> SegmentedControl(
      * label; the label survives as the content description.
      */
     iconRes: ((T) -> Int)? = null,
+    /**
+     * Options that exist but currently lead nowhere render dimmed. They stay
+     * tappable — the tap's answer (usually a toast) is the explanation.
+     */
+    optionDimmed: ((T) -> Boolean)? = null,
 ) {
     val trackShape = RoundedCornerShape(Radius.control)
     val thumbShape = RoundedCornerShape(Radius.chip)
@@ -220,11 +225,13 @@ fun <T> SegmentedControl(
                         animationSpec = tween(200),
                         label = "segText",
                     )
+                    val dimmed = !active && optionDimmed?.invoke(option) == true
+                    val finalColor = if (dimmed) textColor.copy(alpha = 0.3f) else textColor
                     if (iconRes != null) {
                         androidx.compose.foundation.Image(
                             painter = androidx.compose.ui.res.painterResource(iconRes(option)),
                             contentDescription = label(option),
-                            colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(textColor),
+                            colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(finalColor),
                             modifier = Modifier.size(16.dp),
                         )
                     } else {
@@ -232,7 +239,7 @@ fun <T> SegmentedControl(
                             text = label(option),
                             style = textStyle,
                             maxLines = 1,
-                            color = textColor,
+                            color = finalColor,
                         )
                     }
                 }

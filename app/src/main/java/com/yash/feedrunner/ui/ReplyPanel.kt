@@ -175,6 +175,9 @@ fun ReplyPanel(
                 WashHeader {
                     PanelHeader(
                         platform = (state as? PanelState.Ready)?.platform,
+                        savedPlatforms = (state as? PanelState.Ready)?.let { ready ->
+                            ready.history.map { it.platform }.toSet() + ready.platform
+                        } ?: emptySet(),
                         onSwitchPlatform = onSwitchPlatform,
                         onDismiss = onDismiss,
                     )
@@ -240,6 +243,7 @@ fun ReplyPanel(
 @Composable
 private fun PanelHeader(
     platform: Platform?,
+    savedPlatforms: Set<Platform>,
     onSwitchPlatform: (Platform) -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -286,6 +290,9 @@ private fun PanelHeader(
                         Platform.GENERAL -> com.yash.feedrunner.R.drawable.ic_brand_general
                     }
                 },
+                // A network with nothing saved reads disabled; the tap still
+                // answers with the toast that says why.
+                optionDimmed = { it !in savedPlatforms },
                 modifier = Modifier
                     .padding(start = Space.sm)
                     .width(136.dp),
