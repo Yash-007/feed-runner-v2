@@ -45,6 +45,11 @@ android {
             // Personal side-project: debug-signed release installs over adb
             // without a keystore ceremony.
             signingConfig = signingConfigs.getByName("debug")
+            // The shared backend token must not ship in a published APK: anyone
+            // who decompiles it would act as the owner account. Release builds
+            // rely purely on the signed-in session token, which the auth gate
+            // guarantees exists before anything talks to the backend.
+            buildConfigField("String", "IDEA_BANK_TOKEN", "\"\"")
         }
     }
 
