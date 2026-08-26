@@ -268,6 +268,14 @@ index migration. Release APK with invite field installed on device.
   redraft has no dedicated button now (regenerate stays same-platform);
   workable via menu platform toggle + fresh capture.
 
+- Follow-up (this commit): investigated Yash's "tabs swapped" report on his
+  actual data — NOT a bug: his two newest results are the same @DrishtiPandita
+  post captured twice, once labeled in, once X (platform = menu toggle at
+  capture time), so both tabs show the "same" post in different voices.
+  General had zero results, so its toast-only tap read as broken. Fix: tabs
+  for networks with nothing saved render dimmed (optionDimmed slot on
+  SegmentedControl; availability from Ready.history). Verified on device.
+
 Nothing in flight. Next work starts fresh from this file.
 
 ## Known open items (older, not urgent)
