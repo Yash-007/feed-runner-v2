@@ -190,6 +190,11 @@ Ideas. X flow regression OK (Last result opens, saved strip works).
   shows probe's EMPTY bank (scoping visible on device), cold start 1.6s /
   warm 0. Signed out after; device back at the sign-in screen.
 
+- Server pill removed from the Ideas header (060bc45): deployed backend is
+  the default, failures still show via the message line + sync counter; the
+  backend-address dialog stays reachable from the empty state. Release APK
+  installed.
+
 Nothing in flight. Next work starts fresh from this file.
 
 ## Known open items (older, not urgent)
