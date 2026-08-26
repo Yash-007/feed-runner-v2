@@ -152,8 +152,9 @@ Ideas. X flow regression OK (Last result opens, saved strip works).
 - Both loading sheets (reply + repost skeletons) now say: "You can close this
   and keep scrolling — you'll get a nudge when the drafts are ready." Verified
   truthful in code: both jobs survive dismissal and toast on completion.
-- APK built (10:04) but NOT installed — device was unplugged. Install + eyeball
-  on next adb connection.
+- Installed and eyeballed on device once replugged; footnote also centred
+  (0d4e8c7). Loading hint verified by code-read (both jobs survive dismissal
+  and toast), skipped the paid call.
 
 Nothing in flight. Next work starts fresh from this file.
 
