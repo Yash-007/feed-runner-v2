@@ -29,6 +29,12 @@
             android:label="Setup"
             android:exported="true" />
 
+        <!-- The front door: shown until first sign-in, then never again. -->
+        <activity
+            android:name=".AuthActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize" />
+
         <service
             android:name=".capture.CaptureService"
             android:exported="false"

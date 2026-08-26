@@ -57,6 +57,37 @@ class IdeaBankApi(
      */
     fun copilot(path: String, payload: JSONObject): JSONObject = request("POST", path, payload)
 
+    /** One account response: session token plus who it belongs to. */
+    data class AuthResult(val token: String, val username: String, val name: String)
+
+    fun signup(username: String, password: String, name: String): AuthResult =
+        auth(
+            "/auth/signup",
+            JSONObject()
+                .put("username", username)
+                .put("password", password)
+                .put("name", name),
+        )
+
+    fun login(username: String, password: String): AuthResult =
+        auth(
+            "/auth/login",
+            JSONObject()
+                .put("username", username)
+                .put("password", password),
+        )
+
+    private fun auth(path: String, payload: JSONObject): AuthResult {
+        val body = request("POST", path, payload)
+        val token = body.optString("token")
+        if (token.isEmpty()) throw IdeaBankException("No token came back.", reachable = true)
+        return AuthResult(
+            token = token,
+            username = body.optString("username"),
+            name = body.optString("name"),
+        )
+    }
+
     /** Returns the seed as stored, so the caller learns its remote id. */
     fun createSeed(entry: StoredSeed): StoredSeed {
         val body = request("POST", "/seeds", entry.toJson())
@@ -256,13 +287,13 @@ class IdeaBankApi(
             connection.readTimeout = READ_TIMEOUT_MS
             connection.setRequestProperty("Accept", "application/json")
             // The deployed backend rejects everything but /healthz without this.
-            // Empty when the backend is a laptop with no token set, and sending
-            // an empty bearer would just be a header saying nothing.
-            if (BuildConfig.IDEA_BANK_TOKEN.isNotBlank()) {
-                connection.setRequestProperty(
-                    "Authorization",
-                    "Bearer ${BuildConfig.IDEA_BANK_TOKEN}",
-                )
+            // A signed-in account's session token wins; the legacy shared token
+            // is the fallback so dev builds and the pinger keep working. Empty
+            // when the backend is a laptop with no token set, and sending an
+            // empty bearer would just be a header saying nothing.
+            val bearer = config.authToken.ifBlank { BuildConfig.IDEA_BANK_TOKEN }
+            if (bearer.isNotBlank()) {
+                connection.setRequestProperty("Authorization", "Bearer $bearer")
             }
 
             if (payload != null) {
@@ -279,10 +310,12 @@ class IdeaBankApi(
             if (code !in 200..299) {
                 // 401 is a mismatched token, which is a setting to fix rather than
                 // something to retry, so it says so instead of echoing "unauthorized".
+                val serverError = body.optString("error").takeIf { it.isNotBlank() }
                 val message = when {
-                    code == 401 -> "Backend rejected the token. Check ideaBank.token."
-                    else -> body.optString("error").takeIf { it.isNotBlank() }
-                        ?: "Server returned $code"
+                    // Auth routes put the real reason ("wrong username or
+                    // password") in the body; only a bare 401 is a token problem.
+                    code == 401 -> serverError ?: "Backend rejected the token. Sign in again."
+                    else -> serverError ?: "Server returned $code"
                 }
                 throw IdeaBankException(message, reachable = true)
             }

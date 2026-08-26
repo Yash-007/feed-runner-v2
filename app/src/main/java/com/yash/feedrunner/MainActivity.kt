@@ -239,6 +239,15 @@ class MainActivity : ComponentActivity() {
                             }
                         }
 
+                        AccountCard(
+                            onSignedOut = {
+                                startActivity(
+                                    Intent(this@MainActivity, AuthActivity::class.java),
+                                )
+                                finishAffinity()
+                            },
+                        )
+
                         Spacer(
                             Modifier
                                 .navigationBarsPadding()
@@ -351,6 +360,45 @@ private fun SetupSection(
                     onAction = onOpenAccessibilitySettings,
                 )
             }
+        }
+    }
+}
+
+/**
+ * Who is signed in, and the way out. Signing out clears the session and
+ * returns to the front door; everything local (results, streak) stays put.
+ */
+@androidx.compose.runtime.Composable
+private fun AccountCard(onSignedOut: () -> Unit) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val config = remember { com.yash.feedrunner.data.BackendConfig(context) }
+
+    HairlineCard {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.padding(Space.lg),
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = config.accountName.ifEmpty { "Signed in" },
+                    style = MaterialTheme.typography.titleMedium,
+                )
+                if (config.accountUsername.isNotEmpty()) {
+                    Text(
+                        text = "@${config.accountUsername}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = Space.xs),
+                    )
+                }
+            }
+            SecondaryButton(
+                label = "Sign out",
+                onClick = {
+                    config.signOut()
+                    onSignedOut()
+                },
+            )
         }
     }
 }

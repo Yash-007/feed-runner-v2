@@ -117,6 +117,16 @@ class IdeasActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // The front door: no account, no app. One-time — the session token
+        // never expires, so this fires only before first sign-in or after a
+        // deliberate sign-out.
+        if (!com.yash.feedrunner.data.BackendConfig(this).isLoggedIn) {
+            startActivity(
+                android.content.Intent(this, com.yash.feedrunner.AuthActivity::class.java),
+            )
+            finish()
+            return
+        }
         // The wash runs behind the status bar; screens pad their own edges.
         enableEdgeToEdge()
         repository = IdeaBankRepository(this)
