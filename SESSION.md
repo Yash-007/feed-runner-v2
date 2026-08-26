@@ -156,6 +156,25 @@ Ideas. X flow regression OK (Last result opens, saved strip works).
   (0d4e8c7). Loading hint verified by code-read (both jobs survive dismissal
   and toast), skipped the paid call.
 
+## Sixth round (2026-08-26): per-user data scoping — done (ee5691b)
+
+- Owner rides the request context: auth middleware resolves the bearer
+  (session token -> that user; shared API_TOKEN -> OWNER_USERNAME env,
+  default "yashx_404") and store.WithOwner stamps it; every store query
+  folds it in via scoped(). Handlers untouched. Empty owner (laptop, no
+  token) = unscoped, old behaviour.
+- Owner field (bson only, json:"-") on IdeaSeed, DraftPick, IdeaBatch.
+  Owner+created_at / owner+picked_at indexes added.
+- Boot migration ClaimUnowned: ownerless rows -> OWNER_USERNAME, idempotent.
+- Verified live: probe_test sees 0 seeds / 0 streak; legacy token sees all
+  153 seeds and the 89-total 10-day streak. Yash picked username yashx_404 —
+  MUST sign up as exactly that to own the data (username is first-come;
+  account does not exist yet, only the mapping).
+- Note: client_seed_id/client_pick_id unique indexes still global (ids carry
+  ms timestamps, collision practically nil). Device-local data (results.json,
+  streak cache, prefs) still single-namespace per phone.
+- Shortened close-me hint APK (d86a86d) installed on device this round.
+
 Nothing in flight. Next work starts fresh from this file.
 
 ## Known open items (older, not urgent)
