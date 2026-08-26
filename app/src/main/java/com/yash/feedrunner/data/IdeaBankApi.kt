@@ -60,13 +60,14 @@ class IdeaBankApi(
     /** One account response: session token plus who it belongs to. */
     data class AuthResult(val token: String, val username: String, val name: String)
 
-    fun signup(username: String, password: String, name: String): AuthResult =
+    fun signup(username: String, password: String, name: String, inviteCode: String): AuthResult =
         auth(
             "/auth/signup",
             JSONObject()
                 .put("username", username)
                 .put("password", password)
-                .put("name", name),
+                .put("name", name)
+                .put("invite_code", inviteCode),
         )
 
     fun login(username: String, password: String): AuthResult =

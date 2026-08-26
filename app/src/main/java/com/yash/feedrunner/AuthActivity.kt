@@ -86,6 +86,7 @@ class AuthActivity : ComponentActivity() {
             FeedRunnerTheme {
                 var mode by remember { mutableStateOf(AuthMode.LOGIN) }
                 var name by remember { mutableStateOf("") }
+                var inviteCode by remember { mutableStateOf("") }
                 var username by remember { mutableStateOf("") }
                 var password by remember { mutableStateOf("") }
                 var showPassword by remember { mutableStateOf(false) }
@@ -107,7 +108,12 @@ class AuthActivity : ComponentActivity() {
                                 val outcome = withContext(Dispatchers.IO) {
                                     runCatching {
                                         if (mode == AuthMode.SIGNUP) {
-                                            api.signup(cleanUsername, password, name.trim())
+                                            api.signup(
+                                                cleanUsername,
+                                                password,
+                                                name.trim(),
+                                                inviteCode.trim(),
+                                            )
                                         } else {
                                             api.login(cleanUsername, password)
                                         }
@@ -179,16 +185,30 @@ class AuthActivity : ComponentActivity() {
                                 )
 
                                 AnimatedVisibility(visible = mode == AuthMode.SIGNUP) {
-                                    AuthField(
-                                        value = name,
-                                        onValueChange = { name = it },
-                                        label = "Your name",
-                                        enabled = !busy,
-                                        keyboardOptions = KeyboardOptions(
-                                            capitalization = KeyboardCapitalization.Words,
-                                            imeAction = ImeAction.Next,
-                                        ),
-                                    )
+                                    Column {
+                                        AuthField(
+                                            value = name,
+                                            onValueChange = { name = it },
+                                            label = "Your name",
+                                            enabled = !busy,
+                                            keyboardOptions = KeyboardOptions(
+                                                capitalization = KeyboardCapitalization.Words,
+                                                imeAction = ImeAction.Next,
+                                            ),
+                                        )
+                                        // The server may gate signups; when it does
+                                        // not, this is ignored there.
+                                        AuthField(
+                                            value = inviteCode,
+                                            onValueChange = { inviteCode = it },
+                                            label = "Invite code",
+                                            enabled = !busy,
+                                            keyboardOptions = KeyboardOptions(
+                                                keyboardType = KeyboardType.Ascii,
+                                                imeAction = ImeAction.Next,
+                                            ),
+                                        )
+                                    }
                                 }
 
                                 AuthField(
