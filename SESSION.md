@@ -121,6 +121,30 @@ Ideas. X flow regression OK (Last result opens, saved strip works).
   and recount — re-probed after deploy, all six drafts 9-10 words on a 15
   cap with real voice rules. App commit be13a56.
 
+## Fifth round (2026-08-26): accounts — done
+
+- Backend (d8af755): users collection (bcrypt hash; unique username + token
+  indexes). Open routes POST /auth/signup {username,password,name} and
+  /auth/login {username,password} → {token,username,name}. Session token =
+  "fr_"+64 hex, never expires, same token returned on every login (second
+  device just works). requireToken accepts session tokens alongside the
+  legacy shared API_TOKEN (kept for the Better Stack pinger + old installs).
+  Validation: username [a-z0-9_]{3,30}, password ≥6, name 1-60.
+- App (8257af1): BackendConfig gains authToken/accountName/accountUsername +
+  signOut; IdeaBankApi sends session token when present, legacy token as
+  fallback, and its 401 message now prefers the server's body text. New
+  AuthActivity: full wash+halftone background, serif wordmark, one card —
+  Sign in/Create account segmented, name field animates in for signup,
+  show/hide password, spinner-in-button, inline errors. IdeasActivity
+  bounces to it until logged in. Setup gets an account card with Sign out
+  (clears session → front door).
+- Verified: curl (signup, duplicate 409, wrong-password 401, login returns
+  same token, session token passes /streak, garbage rejected) AND on-device
+  (login as probe_test → Ideas loads; sign out → auth screen). Device left
+  at the sign-in screen — Yash creates his real account there.
+- DB litter: one test user "probe_test" (password probe123) in users
+  collection; delete whenever.
+
 Nothing in flight. Next work starts fresh from this file.
 
 ## Known open items (older, not urgent)
