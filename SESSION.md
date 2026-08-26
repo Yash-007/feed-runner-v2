@@ -243,6 +243,22 @@ index migration. Release APK with invite field installed on device.
   phone has the old "reply"=15 key, so his sliders read 15 until he moves
   them. Installed.
 
+## Tenth round (2026-08-26): panel platform tabs + rail marks — done (2da0f93)
+
+- Reply sheet header: static platform chip replaced by the icon SegmentedControl
+  (X | in | spark, 136dp, thumb in the platform's hue; wordmark trimmed to 19sp
+  so Close never clips). Tapping another tab calls switchPlatform -> redrafts
+  the SAME capture under that platform's prompts (regenerateAs path; no-op on
+  same tab; toast if the capture file is gone). Hidden while loading.
+- HistoryEntry carries platform; each saved-rail card shows the brand mark
+  tinted in its hue before the author.
+- Verified on device (dark theme): tabs render w/ LinkedIn thumb, rail shows
+  "in" marks. Tab-switch redraft not exercised on device (same code path as
+  regenerate, already proven; saves a vision call).
+- Device driving now guarded: locate bubble by pixel scan, check
+  mCurrentFocus/launcher idle before any scripted taps (bubble pill moved
+  after the server pill was removed — coords (845,225) in current layout).
+
 Nothing in flight. Next work starts fresh from this file.
 
 ## Known open items (older, not urgent)
