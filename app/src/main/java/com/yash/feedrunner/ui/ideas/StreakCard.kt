@@ -29,6 +29,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.yash.feedrunner.ui.Streak
+import com.yash.feedrunner.ui.theme.DigitTicker
 import com.yash.feedrunner.ui.theme.MetaTextStyle
 import com.yash.feedrunner.ui.theme.Motion
 import com.yash.feedrunner.ui.theme.Radius
@@ -59,8 +60,9 @@ internal fun StreakCard(streak: Streak, modifier: Modifier = Modifier) {
                 .padding(horizontal = Space.lg, vertical = Space.md),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = "${streak.today}",
+                // Rolls when the count moves — the small daily reward.
+                DigitTicker(
+                    value = streak.today,
                     style = MaterialTheme.typography.titleLarge,
                     color = MaterialTheme.colorScheme.onBackground,
                 )

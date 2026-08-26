@@ -80,7 +80,10 @@ import com.yash.feedrunner.ui.theme.WashHeader
 import com.yash.feedrunner.ui.theme.Radius
 import com.yash.feedrunner.ui.theme.Space
 import com.yash.feedrunner.ui.theme.pressClickable
+import com.yash.feedrunner.ui.theme.DrawnCheck
 import com.yash.feedrunner.ui.theme.SegmentedControl
+import com.yash.feedrunner.ui.theme.ShimmerText
+import com.yash.feedrunner.ui.theme.StaggerIn
 import com.yash.feedrunner.ui.theme.shimmer
 import com.yash.feedrunner.ui.theme.WordLimitSlider
 import androidx.compose.animation.core.animateFloatAsState
@@ -338,11 +341,11 @@ private fun LoadingBody() {
                 animationSpec = tween(300),
                 label = "loadingStage",
             ) { index ->
-                Text(
+                // Shimmering, not static: the line itself looks like thinking.
+                ShimmerText(
                     text = LOADING_STAGES[index],
                     modifier = Modifier.padding(start = 10.dp),
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         }
@@ -495,18 +498,23 @@ private fun ReadyBody(
                 onViewCapture = onViewCapture,
             )
 
-            state.drafts.forEach { draft ->
-                DraftCard(
-                    draft = draft,
-                    refinements = refinements,
-                    copied = copiedId == draft.id,
-                    onCopy = {
-                        onDraftCopy(draft)
-                        copiedId = draft.id
-                    },
-                    onToggleUsed = { onToggleUsed(draft) },
-                    onRefine = { refinement -> onRefine(draft, refinement) },
-                )
+            // A fresh batch settles in card by card rather than as a wall.
+            // Keyed on the result, so refinements editing a card in place
+            // never replay the entrance.
+            state.drafts.forEachIndexed { index, draft ->
+                StaggerIn(key = resultKey, index = index) {
+                    DraftCard(
+                        draft = draft,
+                        refinements = refinements,
+                        copied = copiedId == draft.id,
+                        onCopy = {
+                            onDraftCopy(draft)
+                            copiedId = draft.id
+                        },
+                        onToggleUsed = { onToggleUsed(draft) },
+                        onRefine = { refinement -> onRefine(draft, refinement) },
+                    )
+                }
             }
 
             // This cap owns the draft cards: the next capture, regenerate, and
@@ -907,13 +915,19 @@ private fun DraftCard(
                 enter = fadeIn() + scaleIn(initialScale = 0.9f),
                 exit = fadeOut(),
             ) {
-                Text(
-                    text = "✓ copied — paste it in",
-                    style = MetaTextStyle,
-                    fontWeight = FontWeight.SemiBold,
-                    color = UsedGreen,
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier.padding(top = 4.dp),
-                )
+                ) {
+                    // The stroke draws itself on: confirmation as a gesture.
+                    DrawnCheck(visible = copied, color = UsedGreen)
+                    Text(
+                        text = " copied — paste it in",
+                        style = MetaTextStyle,
+                        fontWeight = FontWeight.SemiBold,
+                        color = UsedGreen,
+                    )
+                }
             }
 
             Text(

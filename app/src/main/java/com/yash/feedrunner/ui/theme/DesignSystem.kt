@@ -38,8 +38,11 @@ import androidx.compose.ui.input.pointer.pointerInput
 import kotlin.math.roundToInt
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.animation.togetherWith
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -390,6 +393,149 @@ fun WordLimitSlider(
 private val SliderTouchHeight = 30.dp
 private val SliderTrack = 4.dp
 private val SliderThumb = 18.dp
+
+/**
+ * A number whose digits roll like a reel when the value changes.
+ *
+ * First composition renders plainly; only a change animates, so opening a
+ * screen is calm and earning a new count is the reward moment. Each digit
+ * animates alone, which is what makes 19 -> 20 read as two small rolls
+ * instead of one text swap.
+ */
+@Composable
+fun DigitTicker(
+    value: Int,
+    style: androidx.compose.ui.text.TextStyle,
+    color: Color,
+    modifier: Modifier = Modifier,
+) {
+    Row(modifier = modifier) {
+        value.toString().forEachIndexed { index, digit ->
+            androidx.compose.animation.AnimatedContent(
+                targetState = digit,
+                transitionSpec = {
+                    (androidx.compose.animation.slideInVertically(Motion.enter()) { it } +
+                        androidx.compose.animation.fadeIn(tween(150))) togetherWith
+                        (androidx.compose.animation.slideOutVertically(tween(150)) { -it } +
+                            androidx.compose.animation.fadeOut(tween(120)))
+                },
+                label = "digit$index",
+            ) { shown ->
+                Text(text = shown.toString(), style = style, color = color)
+            }
+        }
+    }
+}
+
+/**
+ * Text with a light band sweeping through it: the "thinking" voice.
+ *
+ * Same grammar as the skeleton shimmer, applied to words instead of blocks,
+ * for status lines that describe work in progress.
+ */
+@Composable
+fun ShimmerText(
+    text: String,
+    style: androidx.compose.ui.text.TextStyle,
+    modifier: Modifier = Modifier,
+) {
+    val transition = rememberInfiniteTransition(label = "textShimmer")
+    val shift by transition.animateFloat(
+        initialValue = -400f,
+        targetValue = 1000f,
+        animationSpec = infiniteRepeatable(tween(durationMillis = 1400)),
+        label = "textShimmerShift",
+    )
+    val base = MaterialTheme.colorScheme.onSurfaceVariant
+    val highlight = MaterialTheme.colorScheme.onSurface
+    Text(
+        text = text,
+        modifier = modifier,
+        style = style.copy(
+            brush = Brush.linearGradient(
+                colors = listOf(base, highlight, base),
+                start = Offset(shift, 0f),
+                end = Offset(shift + 400f, 0f),
+            ),
+        ),
+    )
+}
+
+/**
+ * A checkmark that draws itself on, stroke first.
+ *
+ * Confirmation as a gesture rather than a glyph appearing: the eye follows
+ * the stroke, which is what makes a copy feel completed.
+ */
+@Composable
+fun DrawnCheck(
+    visible: Boolean,
+    color: Color,
+    modifier: Modifier = Modifier.size(13.dp),
+    strokeWidth: Dp = 2.dp,
+) {
+    val progress by animateFloatAsState(
+        targetValue = if (visible) 1f else 0f,
+        animationSpec = Motion.enter(),
+        label = "checkDraw",
+    )
+    androidx.compose.foundation.Canvas(modifier = modifier) {
+        if (progress <= 0f) return@Canvas
+        val path = androidx.compose.ui.graphics.Path().apply {
+            moveTo(size.width * 0.12f, size.height * 0.55f)
+            lineTo(size.width * 0.40f, size.height * 0.82f)
+            lineTo(size.width * 0.88f, size.height * 0.20f)
+        }
+        val measure = androidx.compose.ui.graphics.PathMeasure()
+        measure.setPath(path, false)
+        val drawn = androidx.compose.ui.graphics.Path()
+        measure.getSegment(0f, measure.length * progress, drawn, true)
+        drawPath(
+            path = drawn,
+            color = color,
+            style = androidx.compose.ui.graphics.drawscope.Stroke(
+                width = strokeWidth.toPx(),
+                cap = androidx.compose.ui.graphics.StrokeCap.Round,
+                join = androidx.compose.ui.graphics.StrokeJoin.Round,
+            ),
+        )
+    }
+}
+
+/**
+ * Enters its content with a fade and a small rise, staggered by [index].
+ *
+ * For lists that arrive all at once — a batch of drafts landing — so they
+ * settle one after another instead of appearing as a wall. Keyed so content
+ * that merely updates in place never re-animates.
+ */
+@Composable
+fun StaggerIn(
+    key: Any?,
+    index: Int,
+    content: @Composable () -> Unit,
+) {
+    var shown by remember(key) { mutableStateOf(false) }
+    androidx.compose.runtime.LaunchedEffect(key) { shown = true }
+    val alpha by animateFloatAsState(
+        targetValue = if (shown) 1f else 0f,
+        animationSpec = tween(durationMillis = 240, delayMillis = index * 45),
+        label = "staggerAlpha",
+    )
+    val rise by animateFloatAsState(
+        targetValue = if (shown) 0f else 1f,
+        animationSpec = tween(durationMillis = 280, delayMillis = index * 45),
+        label = "staggerRise",
+    )
+    Box(
+        modifier = Modifier.graphicsLayer {
+            this.alpha = alpha
+            translationY = rise * 14.dp.toPx()
+        },
+    ) {
+        content()
+    }
+}
 
 /**
  * The loading texture: a soft band of the primary drifting across a pale block.

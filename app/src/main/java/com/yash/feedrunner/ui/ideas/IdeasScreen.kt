@@ -448,14 +448,47 @@ private fun EmptyState(
         contentAlignment = Alignment.Center,
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            // The zero state gets the full anatomy — mark, serif title, one
+            // line, one action — instead of a lone sentence in dead air.
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier
+                    .size(56.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)),
+            ) {
+                androidx.compose.foundation.Image(
+                    painter = androidx.compose.ui.res.painterResource(
+                        com.yash.feedrunner.R.drawable.ic_brand_general,
+                    ),
+                    contentDescription = null,
+                    colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(
+                        MaterialTheme.colorScheme.primary,
+                    ),
+                    modifier = Modifier.size(24.dp),
+                )
+            }
+            Text(
+                text = when {
+                    !configured -> "No backend yet"
+                    filtered -> "Nothing matches"
+                    else -> "No seeds yet"
+                },
+                style = MaterialTheme.typography.headlineSmall,
+                color = MaterialTheme.colorScheme.onBackground,
+                modifier = Modifier.padding(top = Space.lg),
+            )
             Text(
                 text = when {
                     !configured -> "Set the backend address to start banking ideas."
-                    filtered -> "Nothing matches these filters."
-                    else -> "No seeds yet. They save themselves when a post is worth building on."
+                    filtered -> "These filters hide everything in the bank."
+                    else -> "Seeds save themselves when a post is worth building on. " +
+                        "Capture something, or add your own below."
                 },
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                modifier = Modifier.padding(top = Space.sm),
             )
             if (!configured) {
                 PrimaryButton(

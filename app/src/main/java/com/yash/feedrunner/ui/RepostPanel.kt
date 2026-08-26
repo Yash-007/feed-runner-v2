@@ -75,6 +75,7 @@ import com.yash.feedrunner.ui.theme.Space
 import com.yash.feedrunner.ui.theme.SoftAccentChip
 import com.yash.feedrunner.ui.theme.Radius
 import com.yash.feedrunner.ui.theme.HairlineCard
+import com.yash.feedrunner.ui.theme.DrawnCheck
 import com.yash.feedrunner.ui.theme.WordLimitSlider
 
 private val SheetShape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp)
@@ -894,12 +895,21 @@ private fun PostDraftCard(
             enter = fadeIn() + scaleIn(initialScale = 0.85f),
             exit = fadeOut() + scaleOut(targetScale = 0.85f),
         ) {
-            Text(
-                text = "copied",
-                fontSize = 9.sp,
-                color = MaterialTheme.colorScheme.primary,
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.padding(top = 3.dp, start = 4.dp),
-            )
+            ) {
+                DrawnCheck(
+                    visible = copied,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(11.dp),
+                )
+                Text(
+                    text = " copied",
+                    fontSize = 9.sp,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            }
         }
     }
 }

@@ -51,6 +51,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
+import androidx.compose.animation.togetherWith
 import com.yash.feedrunner.ui.theme.RoundIconButton
 import com.yash.feedrunner.ui.theme.Space
 import com.yash.feedrunner.ui.theme.Radius
@@ -164,6 +165,7 @@ internal fun ChatComposer(
         ChatInput(
             value = input,
             enabled = !pending,
+            busy = pending,
             onValueChange = { input = it },
             onFocusChanged = onFocusChanged,
             onSend = {
@@ -386,6 +388,7 @@ private fun ChatBubble(
 private fun ChatInput(
     value: String,
     enabled: Boolean,
+    busy: Boolean,
     onValueChange: (String) -> Unit,
     onFocusChanged: (Boolean) -> Unit,
     onSend: () -> Unit,
@@ -412,13 +415,58 @@ private fun ChatInput(
                 .weight(1f)
                 .onFocusChanged { onFocusChanged(it.isFocused) },
         )
-        RoundIconButton(
-            glyph = "↑",
-            diameter = 42.dp,
+        SendButton(
+            busy = busy,
             enabled = canSend,
             onClick = onSend,
             modifier = Modifier.padding(start = Space.sm),
         )
+    }
+}
+
+/**
+ * The send control wears the request's state: an arrow at rest, a spinner
+ * while the model writes. One morphing surface instead of a button that goes
+ * dead plus a spinner somewhere else.
+ */
+@Composable
+private fun SendButton(
+    busy: Boolean,
+    enabled: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val alpha = if (enabled || busy) 1f else 0.35f
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = modifier
+            .size(42.dp)
+            .clip(CircleShape)
+            .background(MaterialTheme.colorScheme.primary.copy(alpha = alpha))
+            .clickable(enabled = enabled, onClick = onClick),
+    ) {
+        androidx.compose.animation.AnimatedContent(
+            targetState = busy,
+            transitionSpec = {
+                (scaleIn(initialScale = 0.6f) + fadeIn()) togetherWith
+                    (scaleOut(targetScale = 0.6f) + fadeOut())
+            },
+            label = "sendMorph",
+        ) { writing ->
+            if (writing) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(16.dp),
+                    strokeWidth = 2.dp,
+                    color = MaterialTheme.colorScheme.onPrimary,
+                )
+            } else {
+                Text(
+                    text = "↑",
+                    color = MaterialTheme.colorScheme.onPrimary,
+                    fontSize = 18.sp,
+                )
+            }
+        }
     }
 }
 
