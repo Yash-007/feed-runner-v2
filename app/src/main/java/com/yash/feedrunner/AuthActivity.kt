@@ -252,7 +252,7 @@ class AuthActivity : ComponentActivity() {
                                 )
 
                                 Text(
-                                    text = "You stay signed in until you sign out.",
+                                    text = "Your ideas, drafts and streak live in your account.",
                                     style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     modifier = Modifier

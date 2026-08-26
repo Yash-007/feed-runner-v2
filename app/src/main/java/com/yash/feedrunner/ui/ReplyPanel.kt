@@ -312,6 +312,20 @@ private fun LoadingBody() {
             }
         }
         repeat(2) { SkeletonDraftCard() }
+
+        // True, and worth saying: the job runs in AnalysisManager, not in this
+        // sheet, so closing costs nothing — a toast and the bubble's badge
+        // announce the drafts when they land.
+        Text(
+            text = "You can close this and keep scrolling — you'll get a nudge " +
+                "when the drafts are ready.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = Space.xs, bottom = Space.sm),
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+        )
     }
 }
 
