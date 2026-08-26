@@ -255,9 +255,10 @@ class AuthActivity : ComponentActivity() {
                                     text = "Your ideas, drafts and streak live in your account.",
                                     style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                                     modifier = Modifier
                                         .padding(top = Space.md)
-                                        .align(Alignment.CenterHorizontally),
+                                        .fillMaxWidth(),
                                 )
                             }
                         }
