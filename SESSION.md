@@ -259,6 +259,15 @@ index migration. Release APK with invite field installed on device.
   mCurrentFocus/launcher idle before any scripted taps (bubble pill moved
   after the server pill was removed — coords (845,225) in current layout).
 
+- Correction (0b5cb52): panel platform tabs now NAVIGATE — newest saved
+  result for the tapped network, no API call (Yash's expectation; the
+  redraft-on-switch behaviour surprised him with a paid call). Empty network
+  -> toast, thumb stays. Tested on device: X tab switched instantly to the
+  saved X result (rail selection followed), General tap no-op'd with toast,
+  logcat -s Copilot empty throughout = zero drafting calls. Cross-platform
+  redraft has no dedicated button now (regenerate stays same-platform);
+  workable via menu platform toggle + fresh capture.
+
 Nothing in flight. Next work starts fresh from this file.
 
 ## Known open items (older, not urgent)
