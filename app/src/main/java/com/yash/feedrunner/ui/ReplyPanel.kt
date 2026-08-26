@@ -268,9 +268,9 @@ private fun PanelHeader(
             color = MaterialTheme.colorScheme.onBackground,
         )
         Box(modifier = Modifier.weight(1f))
-        // The platform tabs, same icons as the bubble menu. Not a label: tapping
-        // another network redrafts this capture in that network's voice.
-        // Absent while loading, when there is nothing to redraft yet.
+        // The platform tabs, same icons as the bubble menu. Navigation: tapping
+        // another network jumps to your newest saved result for it, free, like
+        // the rail below. Absent while loading.
         platform?.let { current ->
             SegmentedControl(
                 options = Platform.entries.toList(),
