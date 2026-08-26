@@ -238,6 +238,11 @@ index migration. Release APK with invite field installed on device.
   turns server-side, nothing destructive).
 - run-as no longer works for prefs inspection (release build, not debuggable).
 
+- Defaults (45eb3f9): drafts + composer caps default to 20 words on fresh
+  installs; post/quote stays auto. Explicit auto (0) is respected. Yash's
+  phone has the old "reply"=15 key, so his sliders read 15 until he moves
+  them. Installed.
+
 Nothing in flight. Next work starts fresh from this file.
 
 ## Known open items (older, not urgent)
