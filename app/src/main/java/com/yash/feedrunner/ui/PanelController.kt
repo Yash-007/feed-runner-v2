@@ -179,7 +179,7 @@ class PanelController(
             drafts = target.drafts,
             source = ResultSource.Cached(target.savedAtMillis),
             history = all.map {
-                HistoryEntry(it.savedAtMillis, it.postContext.author, it.thumbnailPath)
+                HistoryEntry(it.savedAtMillis, it.postContext.author, it.thumbnailPath, it.platform)
             },
             chat = target.chat,
             thumbnailPath = target.thumbnailPath,
@@ -222,6 +222,7 @@ class PanelController(
                     onAngleBatch = ::moreInAngle,
                     onCopyText = ::copyText,
                     onChatFocusChanged = window::setFocusable,
+                    onSwitchPlatform = ::switchPlatform,
                     draftLimit = draftLimit,
                     onDraftLimit = ::updateDraftLimit,
                     chatLimit = chatLimit,
@@ -252,7 +253,28 @@ class PanelController(
      * the drafts being replaced came from the image, so their replacements
      * should read it too, not just the extracted text.
      */
-    private fun regenerate() {
+    private fun regenerate() = regenerateAs(null)
+
+    /**
+     * The panel's platform tabs. Drafts are platform-shaped all the way
+     * through, so switching redrafts the same capture under the new prompt
+     * rather than relabelling text written for somewhere else.
+     */
+    private fun switchPlatform(target: Platform) {
+        val ready = state as? PanelState.Ready ?: return
+        if (target == ready.platform) return
+        if (ready.capturePath == null) {
+            Toast.makeText(
+                context,
+                "The capture behind this result is gone, so it cannot be redrafted",
+                Toast.LENGTH_SHORT,
+            ).show()
+            return
+        }
+        regenerateAs(target)
+    }
+
+    private fun regenerateAs(target: Platform?) {
         val ready = state as? PanelState.Ready ?: return
         val path = ready.capturePath
         if (path == null) {
@@ -260,7 +282,7 @@ class PanelController(
                 .show()
             return
         }
-        val requestPlatform = ready.platform
+        val requestPlatform = target ?: ready.platform
         generation++
         state = PanelState.Loading
         worker.execute {

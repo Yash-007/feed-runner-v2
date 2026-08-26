@@ -80,6 +80,7 @@ import com.yash.feedrunner.ui.theme.WashHeader
 import com.yash.feedrunner.ui.theme.Radius
 import com.yash.feedrunner.ui.theme.Space
 import com.yash.feedrunner.ui.theme.pressClickable
+import com.yash.feedrunner.ui.theme.SegmentedControl
 import com.yash.feedrunner.ui.theme.shimmer
 import com.yash.feedrunner.ui.theme.WordLimitSlider
 import androidx.compose.animation.core.animateFloatAsState
@@ -102,6 +103,7 @@ fun ReplyPanel(
     onAngleBatch: (Angle) -> Unit,
     onCopyText: (String) -> Unit,
     onChatFocusChanged: (Boolean) -> Unit,
+    onSwitchPlatform: (Platform) -> Unit,
     draftLimit: Int,
     onDraftLimit: (Int) -> Unit,
     chatLimit: Int,
@@ -173,6 +175,7 @@ fun ReplyPanel(
                 WashHeader {
                     PanelHeader(
                         platform = (state as? PanelState.Ready)?.platform,
+                        onSwitchPlatform = onSwitchPlatform,
                         onDismiss = onDismiss,
                     )
                 }
@@ -235,7 +238,11 @@ fun ReplyPanel(
 }
 
 @Composable
-private fun PanelHeader(platform: Platform?, onDismiss: () -> Unit) {
+private fun PanelHeader(
+    platform: Platform?,
+    onSwitchPlatform: (Platform) -> Unit,
+    onDismiss: () -> Unit,
+) {
     Column(modifier = Modifier.fillMaxWidth()) {
     // The sheet grammar every bottom sheet teaches: this is a surface that rose
     // from the bottom, and the scrim above it is tappable.
@@ -255,18 +262,35 @@ private fun PanelHeader(platform: Platform?, onDismiss: () -> Unit) {
     ) {
         Text(
             text = "Feed Runner",
-            style = MaterialTheme.typography.headlineSmall,
+            // A notch under headlineSmall: the row now also holds the platform
+            // tabs, and the wordmark yields before Close ever clips.
+            style = MaterialTheme.typography.headlineSmall.copy(fontSize = 19.sp),
             color = MaterialTheme.colorScheme.onBackground,
         )
-        // Which network's voice drafted what is below. Absent while loading.
-        platform?.let {
-            SoftAccentChip(
-                text = it.label,
-                hue = it.hue,
-                modifier = Modifier.padding(start = Space.sm),
+        Box(modifier = Modifier.weight(1f))
+        // The platform tabs, same icons as the bubble menu. Not a label: tapping
+        // another network redrafts this capture in that network's voice.
+        // Absent while loading, when there is nothing to redraft yet.
+        platform?.let { current ->
+            SegmentedControl(
+                options = Platform.entries.toList(),
+                selected = current,
+                label = { it.label },
+                onSelect = onSwitchPlatform,
+                thumbColor = current.hue,
+                onThumbColor = Color.White,
+                iconRes = {
+                    when (it) {
+                        Platform.X -> com.yash.feedrunner.R.drawable.ic_brand_x
+                        Platform.LINKEDIN -> com.yash.feedrunner.R.drawable.ic_brand_linkedin
+                        Platform.GENERAL -> com.yash.feedrunner.R.drawable.ic_brand_general
+                    }
+                },
+                modifier = Modifier
+                    .padding(start = Space.sm)
+                    .width(136.dp),
             )
         }
-        Box(modifier = Modifier.weight(1f))
         Text(
             text = "Close",
             style = MaterialTheme.typography.labelLarge,
@@ -780,13 +804,33 @@ private fun HistoryCard(entry: HistoryEntry, selected: Boolean, onClick: () -> U
             )
         }
         Column(modifier = Modifier.padding(start = if (thumbnail != null) 6.dp else 2.dp)) {
-            Text(
-                text = entry.author.ifEmpty { "unknown" },
-                fontSize = 11.sp,
-                fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                // The brand mark, in its hue, so a LinkedIn comment and an X
+                // reply stop looking interchangeable in the rail.
+                Image(
+                    painter = androidx.compose.ui.res.painterResource(
+                        when (entry.platform) {
+                            Platform.X -> com.yash.feedrunner.R.drawable.ic_brand_x
+                            Platform.LINKEDIN -> com.yash.feedrunner.R.drawable.ic_brand_linkedin
+                            Platform.GENERAL -> com.yash.feedrunner.R.drawable.ic_brand_general
+                        },
+                    ),
+                    contentDescription = entry.platform.label,
+                    colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(
+                        entry.platform.hue,
+                    ),
+                    modifier = Modifier
+                        .padding(end = 4.dp)
+                        .size(11.dp),
+                )
+                Text(
+                    text = entry.author.ifEmpty { "unknown" },
+                    fontSize = 11.sp,
+                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
             Text(
                 text = relativeAge(entry.savedAtMillis),
                 fontSize = 9.sp,

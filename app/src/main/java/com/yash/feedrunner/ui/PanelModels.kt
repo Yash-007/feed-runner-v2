@@ -139,6 +139,8 @@ data class HistoryEntry(
     val savedAtMillis: Long,
     val author: String,
     val thumbnailPath: String?,
+    /** Which network drafted it, so the rail can tell a comment from a reply. */
+    val platform: Platform = Platform.X,
 )
 
 /** Whether the drafts on screen were just generated or restored from disk. */
