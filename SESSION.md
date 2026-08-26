@@ -286,6 +286,26 @@ index migration. Release APK with invite field installed on device.
   anyone with the URL can create an account and spend the Anthropic key.
 - Bubble left running on device; phone has the same build as the Desktop APK.
 
+## Eleventh round (2026-08-27): web component library patterns — done (838b225)
+
+- Surveyed via 5 parallel agents: beautifului.dev, beui.dev, rareui.com,
+  transitions.dev, ui.shadcn.com (full catalogs in their reports; convergent
+  picks implemented, web code NOT portable — patterns re-built in Compose).
+- Shipped: DigitTicker (per-digit reel roll, streak count; first composition
+  static, changes animate), ShimmerText (drafting stage line), DrawnCheck
+  (stroke-draw check on copied, reply + repost), SendButton morph (arrow ->
+  spinner via AnimatedContent, ChatUi), StaggerIn (draft cards settle 45ms
+  apart, keyed on resultKey so refinements never replay), Ideas empty-state
+  anatomy (tinted spark circle + serif title + line + CTA) — all in
+  DesignSystem + surface wiring.
+- Verified on device: empty state (filtered view) renders; ticker/stagger/
+  morph compile-verified only (need value changes / generation to see).
+  Desktop APK refreshed. Yash actively using app (5 sent today, 11-day
+  streak) — keep guarding scripted taps.
+- Parked ideas from the survey (good, not now): sonner-style action toasts w/
+  undo, long-press context menu on cards, GitHub-heatmap streak, grid-reveal
+  loader, emoji/leaf burst on pick, command palette for ideas search.
+
 Nothing in flight. Next work starts fresh from this file.
 
 ## Known open items (older, not urgent)
