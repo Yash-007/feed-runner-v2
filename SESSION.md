@@ -145,6 +145,16 @@ Ideas. X flow regression OK (Last result opens, saved strip works).
 - DB litter: one test user "probe_test" (password probe123) in users
   collection; delete whenever.
 
+## Copy tweaks (2026-08-26, 1897dfd)
+
+- Auth footnote: session-mechanics line replaced with "Your ideas, drafts and
+  streak live in your account."
+- Both loading sheets (reply + repost skeletons) now say: "You can close this
+  and keep scrolling — you'll get a nudge when the drafts are ready." Verified
+  truthful in code: both jobs survive dismissal and toast on completion.
+- APK built (10:04) but NOT installed — device was unplugged. Install + eyeball
+  on next adb connection.
+
 Nothing in flight. Next work starts fresh from this file.
 
 ## Known open items (older, not urgent)
