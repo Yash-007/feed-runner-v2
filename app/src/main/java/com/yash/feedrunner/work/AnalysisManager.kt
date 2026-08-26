@@ -83,7 +83,7 @@ class AnalysisManager(
             val voiceRules = voiceRulesStore.rules
             val outcome = runCatching {
                 val segments = ImagePrep.toBase64Segments(screenshot)
-                val analysis = client.analyze(segments, voiceRules, platform, wordLimits.replyLimit)
+                val analysis = client.analyze(segments, voiceRules, platform, wordLimits.draftLimit)
                 val saved = resultStore.save(
                     postContext = analysis.postContext,
                     drafts = analysis.drafts,

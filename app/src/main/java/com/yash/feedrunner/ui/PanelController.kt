@@ -55,8 +55,9 @@ class PanelController(
 
     private var state by mutableStateOf<PanelState>(PanelState.Loading)
 
-    /** The reply word cap, mirrored into state so the slider follows edits. */
-    private var replyLimit by mutableStateOf(0)
+    /** The two reply caps, mirrored into state so the sliders follow edits. */
+    private var draftLimit by mutableStateOf(0)
+    private var chatLimit by mutableStateOf(0)
 
     /**
      * The analysis job this panel is currently displaying, if any. The job keeps
@@ -205,7 +206,8 @@ class PanelController(
 
     private fun openWindow() {
         generation++
-        replyLimit = wordLimits.replyLimit
+        draftLimit = wordLimits.draftLimit
+        chatLimit = wordLimits.chatLimit
         state = PanelState.Loading
         window.show(gravity = Gravity.BOTTOM) {
             FeedRunnerTheme {
@@ -220,8 +222,10 @@ class PanelController(
                     onAngleBatch = ::moreInAngle,
                     onCopyText = ::copyText,
                     onChatFocusChanged = window::setFocusable,
-                    wordLimit = replyLimit,
-                    onWordLimit = ::setWordLimit,
+                    draftLimit = draftLimit,
+                    onDraftLimit = ::updateDraftLimit,
+                    chatLimit = chatLimit,
+                    onChatLimit = ::updateChatLimit,
                     onRegenerate = ::regenerate,
                     onRetry = ::dismiss,
                     onDismiss = ::dismiss,
@@ -232,9 +236,14 @@ class PanelController(
     }
 
     /** Persisted immediately: the cap applies to the next capture too. */
-    private fun setWordLimit(limit: Int) {
-        replyLimit = limit
-        wordLimits.replyLimit = limit
+    private fun updateDraftLimit(limit: Int) {
+        draftLimit = limit
+        wordLimits.draftLimit = limit
+    }
+
+    private fun updateChatLimit(limit: Int) {
+        chatLimit = limit
+        wordLimits.chatLimit = limit
     }
 
     /**
@@ -285,7 +294,7 @@ class PanelController(
                     postContext = activeContext,
                     extraVoiceRules = voiceRules,
                     platform = requestPlatform,
-                    wordLimit = wordLimits.replyLimit,
+                    wordLimit = wordLimits.draftLimit,
                 )
             }
 
@@ -339,7 +348,7 @@ class PanelController(
                     userMessage = message,
                     extraVoiceRules = voiceRules,
                     platform = requestPlatform,
-                    wordLimit = wordLimits.replyLimit,
+                    wordLimit = wordLimits.draftLimit,
                 )
             }
 
@@ -405,7 +414,7 @@ class PanelController(
             val outcome = runCatching {
                 client.repliesInAngle(
                     angle, activeContext, drafts, voiceRules, requestPlatform,
-                    wordLimit = wordLimits.replyLimit,
+                    wordLimit = wordLimits.chatLimit,
                 )
             }
 

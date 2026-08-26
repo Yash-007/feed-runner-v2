@@ -102,8 +102,10 @@ fun ReplyPanel(
     onAngleBatch: (Angle) -> Unit,
     onCopyText: (String) -> Unit,
     onChatFocusChanged: (Boolean) -> Unit,
-    wordLimit: Int,
-    onWordLimit: (Int) -> Unit,
+    draftLimit: Int,
+    onDraftLimit: (Int) -> Unit,
+    chatLimit: Int,
+    onChatLimit: (Int) -> Unit,
     onRegenerate: () -> Unit,
     onRetry: () -> Unit,
     onDismiss: () -> Unit,
@@ -181,8 +183,10 @@ fun ReplyPanel(
                     is PanelState.Error -> ErrorBody(state.message, onRetry)
                     is PanelState.Ready -> ReadyBody(
                         state = state,
-                        wordLimit = wordLimit,
-                        onWordLimit = onWordLimit,
+                        draftLimit = draftLimit,
+                        onDraftLimit = onDraftLimit,
+                        chatLimit = chatLimit,
+                        onChatLimit = onChatLimit,
                         onRegenerate = onRegenerate,
                         onDraftCopy = onDraftCopy,
                         onToggleUsed = onToggleUsed,
@@ -390,8 +394,10 @@ private fun ErrorBody(message: String, onRetry: () -> Unit) {
 @Composable
 private fun ReadyBody(
     state: PanelState.Ready,
-    wordLimit: Int,
-    onWordLimit: (Int) -> Unit,
+    draftLimit: Int,
+    onDraftLimit: (Int) -> Unit,
+    chatLimit: Int,
+    onChatLimit: (Int) -> Unit,
     onRegenerate: () -> Unit,
     onDraftCopy: (Draft) -> Unit,
     onToggleUsed: (Draft) -> Unit,
@@ -472,15 +478,15 @@ private fun ReadyBody(
                 )
             }
 
-            // The same cap as the slider by the composer — one value, two
-            // handles — with the do-over right beside it: a fresh first batch
-            // at the length now under the thumb. Costs a full analysis call.
+            // This cap owns the draft cards: the next capture, regenerate, and
+            // the refine chips. The composer below keeps its own — a tight
+            // batch with a looser chat is a real combination.
             Column {
                 WordLimitSlider(
-                    value = wordLimit,
+                    value = draftLimit,
                     range = 10..60,
                     step = 5,
-                    onValueChange = onWordLimit,
+                    onValueChange = onDraftLimit,
                 )
                 if (state.capturePath != null) {
                     Text(
@@ -515,13 +521,13 @@ private fun ReadyBody(
                 }
             }
 
-            // The cap steers everything generated from here on: angle batches,
-            // chat answers, refinements, and the next capture.
+            // The chat's own cap: angle batches and answers, independent of
+            // the draft cards' slider above.
             WordLimitSlider(
-                value = wordLimit,
+                value = chatLimit,
                 range = 10..60,
                 step = 5,
-                onValueChange = onWordLimit,
+                onValueChange = onChatLimit,
             )
 
             ChatComposer(
