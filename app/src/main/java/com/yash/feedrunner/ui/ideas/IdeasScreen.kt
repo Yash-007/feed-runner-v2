@@ -97,11 +97,9 @@ fun IdeasScreen(state: IdeasUiState, actions: IdeasActions) {
     Column(modifier = Modifier.fillMaxSize()) {
         Header(
             pendingCount = state.pendingCount,
-            serverReachable = state.serverReachable,
             bubbleRunning = state.bubbleRunning,
             onToggleBubble = actions.onToggleBubble,
             onOpenSetup = actions.onOpenSetup,
-            onEditAddress = { showAddressDialog = true },
         )
 
         StreakCard(
@@ -199,11 +197,9 @@ fun IdeasScreen(state: IdeasUiState, actions: IdeasActions) {
 @Composable
 private fun Header(
     pendingCount: Int,
-    serverReachable: Boolean?,
     bubbleRunning: Boolean,
     onToggleBubble: () -> Unit,
     onOpenSetup: () -> Unit,
-    onEditAddress: () -> Unit,
 ) {
     WashHeader(padStatusBar = true) {
       Column(
@@ -232,18 +228,10 @@ private fun Header(
                 },
                 onClick = onToggleBubble,
             )
-            // A dot beats a word: the only thing worth knowing at a glance is
-            // whether the backend is answering. Tap edits the address.
-            HeaderPill(
-                label = "server",
-                dotColor = when (serverReachable) {
-                    true -> Color(0xFF00BA7C)
-                    false -> MaterialTheme.colorScheme.error
-                    null -> MaterialTheme.colorScheme.outline
-                },
-                onClick = onEditAddress,
-            )
-            // Permissions, voice rules and appearance moved one tap away.
+            // Permissions, voice rules and appearance moved one tap away. The
+            // server dot that used to sit here retired with the laptop backend:
+            // the deployed address is the default, and failures still surface
+            // through the message line and the sync counter.
             Text(
                 text = "⚙",
                 fontSize = 17.sp,
