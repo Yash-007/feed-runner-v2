@@ -225,6 +225,19 @@ index migration. Release APK with invite field installed on device.
   classes.dex). Release relies wholly on the session token behind the auth
   gate. Debug builds keep the token for adb work.
 
+## Ninth round (2026-08-26): split reply caps — done
+
+- Reply sheet sliders independent now: draftLimit (capture/regenerate/refine;
+  key reply_drafts) vs chatLimit (chat + angle batches; key reply_chat), old
+  "reply" key read as default for both. Phone-local by choice. Repost cap
+  unchanged. Release built + installed.
+- Yash signed up on device as yashx_404 (his session showed owned seeds, dark
+  theme active). NOTE: device is now actively HIS — no more scripted
+  input taps without checking mCurrentFocus first; a blind login script this
+  round typed into his open seed thread (harmlessly — verified no stray chat
+  turns server-side, nothing destructive).
+- run-as no longer works for prefs inspection (release build, not debuggable).
+
 Nothing in flight. Next work starts fresh from this file.
 
 ## Known open items (older, not urgent)
