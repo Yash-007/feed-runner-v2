@@ -317,8 +317,7 @@ private fun LoadingBody() {
         // sheet, so closing costs nothing — a toast and the bubble's badge
         // announce the drafts when they land.
         Text(
-            text = "You can close this and keep scrolling — you'll get a nudge " +
-                "when the drafts are ready.",
+            text = "Safe to close — we'll nudge you when they're ready.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier

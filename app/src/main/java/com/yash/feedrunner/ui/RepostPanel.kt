@@ -700,8 +700,7 @@ private fun GeneratingRow(mode: RepostMode) {
         // Same promise the reply sheet makes, and equally true here: a closed
         // sheet holds the result and a toast announces it.
         Text(
-            text = "You can close this and keep scrolling — you'll get a nudge " +
-                "when the drafts are ready.",
+            text = "Safe to close — we'll nudge you when they're ready.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier
