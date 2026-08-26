@@ -195,6 +195,31 @@ Ideas. X flow regression OK (Last result opens, saved strip works).
   backend-address dialog stays reachable from the empty state. Release APK
   installed.
 
+## Eighth round (2026-08-26): pre-publish backend review — done
+
+Reviewed the whole backend. Fixed (backend 6ceb1ce, app 393c8bf, deployed):
+- Signup gated by SIGNUP_CODE env (403 on mismatch; empty = open + boot
+  warning). App signup form gained an "Invite code" field (ignored when the
+  server has no code). *** ACTION FOR YASH: set SIGNUP_CODE in Render env
+  BEFORE publishing the APK, else anyone can create accounts and spend the
+  Anthropic key. ***
+- /auth/* rate limited: 20/min per IP (fixed window, in-memory,
+  X-Forwarded-For aware). Verified live: hammering returns 429s, normal
+  login works after the window.
+- client_seed_id / client_pick_id uniqueness now per owner (partial index for
+  seeds since hand-typed ones lack the id); old global indexes dropped at
+  boot. Fixes the cross-account duplicate-key 500 that would have stuck the
+  app outbox in a retry loop.
+- Login timing flattened: unknown usernames burn a dummy bcrypt.
+- Anthropic calls: option.WithRequestTimeout(150s) — closes the old "server
+  side timeout unimplemented" item.
+Accepted as-is (noted, low risk): session tokens stored plaintext in mongo,
+never-expiring sessions, global deleted_ideas counter, chat replies returned
+but unsaved if mongo write fails after generation.
+Verified after deploy: probe_test login OK (same token), signup validation
+answers (not 403, code unset), 153 seeds + 89/10 streak intact through the
+index migration. Release APK with invite field installed on device.
+
 Nothing in flight. Next work starts fresh from this file.
 
 ## Known open items (older, not urgent)
