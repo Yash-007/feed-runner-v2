@@ -424,9 +424,10 @@ Two things the device caught that no test would have:
 
 ## Credentials note (2026-08-31)
 
-- X account for the harvester: `<redacted>`, stored in `feed-engine/
-  config.local.yaml` (gitignored, verified). Password is plaintext on disk
-  there, and was pasted into a chat transcript, so **rotate it when convenient**.
+- X account for the harvester: stored in `feed-engine/config.local.yaml`
+  (gitignored, verified). Not named here on purpose — these repos are public.
+  Password is plaintext on disk there and was pasted into a chat, so
+  **rotate it**. It also briefly reached a public repo; see the leak note below.
   `login.auto_login` is false: assisted login fills the two fields and then
   waits for a human, because X interleaves a challenge or 2FA often enough that
   unattended login mostly fails confusingly. The profile is currently signed in,
@@ -457,6 +458,30 @@ Note the lesson about the earlier "verified" claim: the cron had been called
 verified on the strength of a `-stage push` wrapper test, which makes no browser
 or model calls and therefore never touched the part that broke. Wrapper tests
 prove the wrapper.
+
+## SECRETS — read this before committing anything (2026-08-31)
+
+**All three repos are PUBLIC.** Check `git status` before `git add -A`; an
+untracked scratch file is exactly how the first of these happened.
+
+1. **X password leaked and was purged.** `task1.txt` held the harvester's X
+   username and password, was swept up by a blanket `git add -A`, and sat in
+   public `feed-runner-v2` for about 80 minutes. History was rewritten in
+   feed-runner-v2 and feed-engine (the handle had also reached both SESSION.md
+   files), backup refs dropped, gc'd, force-pushed, and verified by fresh-cloning
+   all three from GitHub: zero hits. **Purging does not undo public exposure —
+   the password must still be rotated.**
+
+2. **The shared API_TOKEN is still exposed and STILL WORKS.** It is written in
+   plain text further up this file and has been in the public repo since
+   2026-08-25 (commit 4f814f1). It is not a small thing: that token reads and
+   writes the whole idea bank as yashx_404 AND spends the Anthropic key through
+   /copilot/* and /ideas/generate. Rotating it means changing API_TOKEN in the
+   Render dashboard, then updating `bank.token` in
+   `feed-engine/config.local.yaml`. Nothing else depends on it — /healthz and
+   /ping are open so the uptime pinger is unaffected, and release APKs ship an
+   empty token and use session tokens. Once rotated, purge it from this file's
+   history too; purging first is pointless while the live value is public.
 
 Nothing in flight except the phone install. Next work starts fresh from this file.
 
