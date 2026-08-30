@@ -1,6 +1,7 @@
 package com.yash.feedrunner.data
 
 import android.content.Context
+import com.yash.feedrunner.ui.SeedLane
 import com.yash.feedrunner.ui.SeedStatus
 
 /**
@@ -18,12 +19,20 @@ class SeedCache(context: Context) {
 
     private val prefs = context.getSharedPreferences("seed_cache", Context.MODE_PRIVATE)
 
-    fun save(status: SeedStatus?, json: String) {
-        prefs.edit().putString(key(status), json).apply()
+    fun save(status: SeedStatus?, lane: SeedLane, json: String) {
+        prefs.edit().putString(key(status, lane), json).apply()
     }
 
-    fun load(status: SeedStatus?): String? = prefs.getString(key(status), null)
+    fun load(status: SeedStatus?, lane: SeedLane): String? =
+        prefs.getString(key(status, lane), null)
 
-    /** One entry per filter, since each is a different answer. */
-    private fun key(status: SeedStatus?) = "seeds_${status?.wire ?: "all"}"
+    /**
+     * One entry per filter combination, since each is a different answer.
+     *
+     * The lane is part of the key because it is applied server-side: caching
+     * the harvested lane under the same key as the whole bank would make an
+     * offline "All" show only what the engine found.
+     */
+    private fun key(status: SeedStatus?, lane: SeedLane) =
+        "seeds_${status?.wire ?: "all"}_${lane.wire ?: "all"}"
 }

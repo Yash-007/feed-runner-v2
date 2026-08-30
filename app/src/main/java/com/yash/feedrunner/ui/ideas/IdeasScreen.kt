@@ -55,7 +55,9 @@ import androidx.compose.ui.unit.sp
 import com.yash.feedrunner.ui.PostIdea
 import com.yash.feedrunner.ui.StoredSeed
 import com.yash.feedrunner.ui.Platform
+import com.yash.feedrunner.ui.SeedLane
 import com.yash.feedrunner.ui.SeedStatus
+import com.yash.feedrunner.ui.theme.SegmentedControl
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.focus.focusRequester
@@ -107,6 +109,18 @@ fun IdeasScreen(state: IdeasUiState, actions: IdeasActions) {
             modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
         )
 
+        // The one split that changes what you are looking at, rather than
+        // narrowing it, so it sits above the chips and looks like a control
+        // instead of another filter.
+        if (state.showLanes) {
+            LaneTabs(
+                lane = state.lane,
+                counts = state.laneCounts,
+                onLane = actions.onLaneChange,
+                modifier = Modifier.padding(horizontal = 14.dp, vertical = Space.xs),
+            )
+        }
+
         FilterBar(
             status = state.filter,
             tag = state.tagFilter,
@@ -131,7 +145,8 @@ fun IdeasScreen(state: IdeasUiState, actions: IdeasActions) {
             if (state.visibleSeeds.isEmpty() && !state.loading) {
                 EmptyState(
                     configured = state.backendConfigured,
-                    filtered = state.filter != null || state.tagFilter != null,
+                    filtered = state.anyFilterActive,
+                    lane = state.lane,
                     onEditAddress = { showAddressDialog = true },
                     onClearFilters = actions.onClearFilters,
                 )
@@ -145,6 +160,7 @@ fun IdeasScreen(state: IdeasUiState, actions: IdeasActions) {
                             seed = seed,
                             onOpen = { actions.onOpenSeed(seed) },
                             onDelete = { actions.onAskDelete(seed) },
+                            onOpenLink = actions.onOpenLink,
                         )
                     }
                 }
@@ -278,6 +294,37 @@ private fun HeaderPill(label: String, dotColor: Color, onClick: () -> Unit) {
             modifier = Modifier.padding(start = 5.dp),
         )
     }
+}
+
+/**
+ * All / Harvested / From me.
+ *
+ * The count rides in the label rather than as a badge: at this size a badge is
+ * a dot you cannot read, and the number is the actual reason to glance here
+ * ("the engine found nine overnight"). The active tab drops its count, because
+ * you are already looking at the list it describes.
+ */
+@Composable
+private fun LaneTabs(
+    lane: SeedLane,
+    counts: Map<SeedLane, Int>,
+    onLane: (SeedLane) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    SegmentedControl(
+        options = SeedLane.entries.toList(),
+        selected = lane,
+        label = { entry ->
+            val count = counts[entry] ?: 0
+            if (entry == lane || count == 0) entry.label else "${entry.label}  $count"
+        },
+        onSelect = onLane,
+        textStyle = MaterialTheme.typography.labelMedium,
+        // A lane with nothing in it still reads, just quietly: it says the
+        // engine has not run yet rather than that the tab is broken.
+        optionDimmed = { (counts[it] ?: 0) == 0 },
+        modifier = modifier,
+    )
 }
 
 @Composable
@@ -438,6 +485,7 @@ private fun BottomBar(onAddManual: () -> Unit) {
 private fun EmptyState(
     configured: Boolean,
     filtered: Boolean,
+    lane: SeedLane,
     onEditAddress: () -> Unit,
     onClearFilters: () -> Unit,
 ) {
@@ -471,6 +519,7 @@ private fun EmptyState(
             Text(
                 text = when {
                     !configured -> "No backend yet"
+                    lane == SeedLane.HARVESTED -> "Nothing harvested yet"
                     filtered -> "Nothing matches"
                     else -> "No seeds yet"
                 },
@@ -481,6 +530,11 @@ private fun EmptyState(
             Text(
                 text = when {
                     !configured -> "Set the backend address to start banking ideas."
+                    // The harvested lane fills itself on a schedule, so an
+                    // empty one is a waiting state, not something to fix here.
+                    lane == SeedLane.HARVESTED ->
+                        "The harvesting engine files these while it reads your feed. " +
+                            "Nothing has landed yet, so check back after its next run."
                     filtered -> "These filters hide everything in the bank."
                     else -> "Seeds save themselves when a post is worth building on. " +
                         "Capture something, or add your own below."
@@ -498,7 +552,14 @@ private fun EmptyState(
                 )
             } else if (filtered) {
                 SecondaryButton(
-                    label = "Clear filters",
+                    // Same action either way; the wording matches what the
+                    // person is actually looking at, so the button is not
+                    // offering to clear filters they never set.
+                    label = if (lane == SeedLane.HARVESTED) {
+                        "Show all seeds"
+                    } else {
+                        "Clear filters"
+                    },
                     modifier = Modifier.padding(top = Space.md),
                     onClick = onClearFilters,
                 )

@@ -76,6 +76,7 @@ internal fun SeedThreadScreen(
     onGenerate: (String) -> Unit,
     onDeleteIdea: (SeedIdea) -> Unit,
     onCopy: (String) -> Unit,
+    onOpenLink: (String) -> Unit,
     onSetStatus: (SeedStatus) -> Unit,
     onDeleteSeed: () -> Unit,
 ) {
@@ -99,6 +100,7 @@ internal fun SeedThreadScreen(
         ThreadHeader(
             seed = seed,
             onBack = onBack,
+            onOpenLink = onOpenLink,
             onSetStatus = onSetStatus,
             onDeleteSeed = onDeleteSeed,
         )
@@ -127,7 +129,7 @@ internal fun SeedThreadScreen(
                 modifier = Modifier.fillMaxSize(),
             ) {
                 if (seed.ideas.isEmpty() && seed.chat.isEmpty()) {
-                    item { EmptyThreadHint() }
+                    item { EmptyThreadHint(isRepost = seed.isRepost) }
                 }
 
                 if (earlierCount > 0) {
@@ -171,6 +173,7 @@ internal fun SeedThreadScreen(
             value = input,
             enabled = !generating,
             hasIdeas = seed.ideas.isNotEmpty(),
+            isRepost = seed.isRepost,
             onValueChange = { input = it },
             onSend = {
                 onGenerate(input.trim())
@@ -227,6 +230,7 @@ private sealed interface ThreadEntry {
 private fun ThreadHeader(
     seed: StoredSeed,
     onBack: () -> Unit,
+    onOpenLink: (String) -> Unit,
     onSetStatus: (SeedStatus) -> Unit,
     onDeleteSeed: () -> Unit,
 ) {
@@ -321,6 +325,14 @@ private fun ThreadHeader(
                     }
                 }
             }
+            if (seed.hasLink) {
+                OriginalPostCard(
+                    seed = seed,
+                    onOpen = { onOpenLink(seed.sourcePostUrl) },
+                    modifier = Modifier.padding(start = 12.dp, end = 12.dp, top = 10.dp),
+                )
+            }
+
             if (seed.lanes.isNotEmpty()) {
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -345,11 +357,83 @@ private fun ThreadHeader(
     }
 }
 
+/**
+ * The post a harvested seed came from, with the way to go and look at it.
+ *
+ * Only harvested seeds have one. It earns a card rather than a line because
+ * this is the screen where you write from the seed, and for a quote post the
+ * original is not context, it is half the finished thing: the reader will see
+ * both, so you have to be able to check what you are attaching yourself to.
+ */
 @Composable
-private fun EmptyThreadHint() {
+private fun OriginalPostCard(
+    seed: StoredSeed,
+    onOpen: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    HairlineCard(modifier = modifier, onClick = onOpen) {
+        Column(modifier = Modifier.padding(Space.md)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (seed.isRepost) {
+                    SoftAccentChip(text = "quote this", hue = MaterialTheme.colorScheme.primary)
+                }
+                if (seed.postAuthor.isNotBlank()) {
+                    Text(
+                        text = seed.postAuthor,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        modifier = Modifier.padding(
+                            start = if (seed.isRepost) Space.sm else 0.dp,
+                        ),
+                    )
+                }
+                Box(modifier = Modifier.weight(1f))
+                Text(
+                    text = "open ↗",
+                    style = MetaTextStyle,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            }
+
+            if (seed.postText.isNotBlank()) {
+                Text(
+                    text = seed.postText,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 4,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(top = Space.sm),
+                )
+            }
+
+            // Said plainly rather than implied by an icon: the text above is a
+            // description of the image on these, so writing from it alone is
+            // how you end up describing a picture you never saw.
+            if (seed.visual) {
+                Text(
+                    text = "▣  this post carries an image, open it before you write",
+                    style = MetaTextStyle,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(top = Space.sm),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun EmptyThreadHint(isRepost: Boolean) {
     Text(
-        text = "Send to generate posts from this seed. Add an instruction first if you " +
-            "want a particular angle.",
+        text = if (isRepost) {
+            "Send to generate quote lines for the post above. They are written to sit " +
+                "on top of it, so keep them short. Add an instruction first if you want " +
+                "a particular angle."
+        } else {
+            "Send to generate posts from this seed. Add an instruction first if you " +
+                "want a particular angle."
+        },
         style = MaterialTheme.typography.bodySmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
         modifier = Modifier.padding(vertical = 20.dp, horizontal = 4.dp),
@@ -493,6 +577,7 @@ private fun Composer(
     value: String,
     enabled: Boolean,
     hasIdeas: Boolean,
+    isRepost: Boolean,
     onValueChange: (String) -> Unit,
     onSend: () -> Unit,
 ) {
@@ -512,7 +597,14 @@ private fun Composer(
                 enabled = enabled,
                 placeholder = {
                     Text(
-                        text = if (hasIdeas) "refine, or send to generate more" else "instruction, optional",
+                        text = when {
+                            hasIdeas -> "refine, or send to generate more"
+                            // Says what will come back, since a quote line is
+                            // a different shape from a standalone post and it
+                            // is not obvious the thread knows the difference.
+                            isRepost -> "send for quote lines, or steer them first"
+                            else -> "instruction, optional"
+                        },
                         style = MaterialTheme.typography.bodyMedium,
                     )
                 },

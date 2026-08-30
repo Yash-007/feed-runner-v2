@@ -5,9 +5,11 @@ import com.yash.feedrunner.BuildConfig
 import com.yash.feedrunner.ui.ChatMessage
 import com.yash.feedrunner.ui.ChatRole
 import com.yash.feedrunner.ui.IdeaSeed
+import com.yash.feedrunner.ui.SeedLane
 import com.yash.feedrunner.ui.Platform
 import com.yash.feedrunner.ui.PostIdea
 import com.yash.feedrunner.ui.DayCount
+import com.yash.feedrunner.ui.SeedCategory
 import com.yash.feedrunner.ui.SeedIdea
 import com.yash.feedrunner.ui.Streak
 import com.yash.feedrunner.ui.SeedSource
@@ -95,16 +97,41 @@ class IdeaBankApi(
             ?: throw IdeaBankException("Server did not return the seed")
     }
 
-    fun listSeeds(status: SeedStatus? = null): List<StoredSeed> {
-        val path = if (status == null) "/seeds" else "/seeds?status=${status.wire}"
-        val array = request("GET", path, null).optJSONArray("seeds") ?: JSONArray()
-        cache?.save(status, array.toString())
-        return array.toSeeds()
+    /** A page of the bank, plus how many seeds each lane holds in total. */
+    data class SeedPage(
+        val seeds: List<StoredSeed>,
+        val harvestedCount: Int = 0,
+        val mineCount: Int = 0,
+    )
+
+    /**
+     * Seeds newest first. [lane] is applied server-side, so a lane stays
+     * complete rather than being whatever survived the newest-N window: the
+     * engine files far faster than replying does, and a client-side split would
+     * lose the older half of the bank within a month.
+     */
+    fun listSeeds(status: SeedStatus? = null, lane: SeedLane = SeedLane.ALL): SeedPage {
+        val query = buildList {
+            status?.let { add("status=${it.wire}") }
+            lane.wire?.let { add("lane=$it") }
+        }
+        val path = if (query.isEmpty()) "/seeds" else "/seeds?" + query.joinToString("&")
+
+        val body = request("GET", path, null)
+        val array = body.optJSONArray("seeds") ?: JSONArray()
+        cache?.save(status, lane, array.toString())
+
+        val counts = body.optJSONObject("counts")
+        return SeedPage(
+            seeds = array.toSeeds(),
+            harvestedCount = counts?.optInt("harvested") ?: 0,
+            mineCount = counts?.optInt("mine") ?: 0,
+        )
     }
 
     /** The last answer for this filter, for when nothing answers now. */
-    fun cachedSeeds(status: SeedStatus? = null): List<StoredSeed> {
-        val raw = cache?.load(status) ?: return emptyList()
+    fun cachedSeeds(status: SeedStatus? = null, lane: SeedLane = SeedLane.ALL): List<StoredSeed> {
+        val raw = cache?.load(status, lane) ?: return emptyList()
         return runCatching { JSONArray(raw).toSeeds() }.getOrDefault(emptyList())
     }
 
@@ -362,6 +389,11 @@ private fun JSONObject.toRemoteSeed(): StoredSeed? = runCatching {
         note = optString("note"),
         postAuthor = optString("post_author"),
         postText = optString("post_text"),
+        // Harvest-only, and absent on every other seed, which is why these are
+        // read leniently rather than required.
+        category = SeedCategory.fromWire(optString("category")),
+        sourcePostUrl = optString("source_post_url"),
+        visual = optBoolean("visual"),
         createdAtMillis = parseTimestamp(optString("created_at")),
         chat = optJSONArray("chat").toChatMessages(),
         ideas = optJSONArray("ideas").toSeedIdeas(),

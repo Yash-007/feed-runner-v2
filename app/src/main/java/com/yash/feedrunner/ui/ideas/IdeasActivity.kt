@@ -16,8 +16,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.lifecycleScope
 import com.yash.feedrunner.bubble.BubbleService
+import com.yash.feedrunner.data.IdeaBankApi
 import com.yash.feedrunner.data.IdeaBankRepository
 import com.yash.feedrunner.ui.Platform
+import com.yash.feedrunner.ui.SeedLane
 import com.yash.feedrunner.ui.SeedStatus
 import com.yash.feedrunner.ui.StoredSeed
 import com.yash.feedrunner.ui.Streak
@@ -36,6 +38,12 @@ data class IdeasUiState(
     /** Seed whose ideation thread is open. Null means the list is showing. */
     val openSeedKey: String? = null,
     val filter: SeedStatus? = null,
+    /**
+     * Which half of the bank is showing. The engine files seeds several times a
+     * day, so without this the harvested pile buries everything that came out
+     * of Yash's own replying within a week.
+     */
+    val lane: SeedLane = SeedLane.ALL,
     /** Theme tag to narrow by, applied on top of the status filter. */
     val tagFilter: String? = null,
     /** Platform filter. Only offered once the bank holds both platforms. */
@@ -52,6 +60,9 @@ data class IdeasUiState(
     /** Null until the first load answers either way. */
     val serverReachable: Boolean? = null,
     val pendingDelete: StoredSeed? = null,
+    /** Lane totals as the server counts them; drive the tab labels. */
+    val harvestedCount: Int = 0,
+    val mineCount: Int = 0,
     /** Always present: cached locally, so a dead backend cannot hide the card. */
     val streak: Streak = Streak(),
     /** Mirrors BubbleService.running for the header's bubble switch. */
@@ -59,9 +70,19 @@ data class IdeasUiState(
 ) {
     val backendConfigured: Boolean get() = baseUrl.isNotEmpty()
 
-    /** Tags across everything loaded, most common first, so the row is useful. */
+    /** Seeds in the chosen lane, before the finer filters. */
+    private val inLane: List<StoredSeed> get() = seeds.filter { lane.accepts(it.source) }
+
+    /**
+     * Tags across the current lane, most common first.
+     *
+     * Scoped to the lane rather than the whole bank on purpose: harvested seeds
+     * carry their category as the first tag, so an unscoped row offered
+     * "shitpost" and "war_story" as filters while you were looking at seeds
+     * that can never match them.
+     */
     val availableTags: List<String>
-        get() = seeds
+        get() = inLane
             .flatMap { it.seed.themeTags }
             .groupingBy { it }
             .eachCount()
@@ -70,18 +91,40 @@ data class IdeasUiState(
             .map { it.key }
             .take(MAX_TAG_CHIPS)
 
+    /**
+     * How many seeds each lane holds, as the server counts them.
+     *
+     * From the server rather than from [seeds], because a lane is fetched on
+     * its own: counting the loaded list would report the lane you are looking
+     * at as the whole bank and the other one as empty.
+     */
+    val laneCounts: Map<SeedLane, Int>
+        get() = mapOf(
+            SeedLane.ALL to (harvestedCount + mineCount),
+            SeedLane.HARVESTED to harvestedCount,
+            SeedLane.MINE to mineCount,
+        )
+
+    /** The tab row only earns its space once both lanes have something in them. */
+    val showLanes: Boolean get() = harvestedCount > 0 && mineCount > 0
+
     /** The platforms actually in the bank; the filter row earns its place at two. */
     val presentPlatforms: List<Platform>
         get() = Platform.entries.filter { p -> seeds.any { it.platform == p } }
 
-    /** The status filter is applied server-side; tag and platform are local. */
+    /** The status filter is applied server-side; the rest are local. */
     val visibleSeeds: List<StoredSeed>
         get() {
-            var visible = seeds
+            var visible = inLane
             platformFilter?.let { p -> visible = visible.filter { it.platform == p } }
             tagFilter?.let { tag -> visible = visible.filter { tag in it.seed.themeTags } }
             return visible
         }
+
+    /** True when something the user chose is hiding seeds that exist. */
+    val anyFilterActive: Boolean
+        get() = filter != null || tagFilter != null ||
+            platformFilter != null || lane != SeedLane.ALL
 
     /** The seed being worked on, if its thread is open. */
     val openSeed: StoredSeed? get() = seeds.firstOrNull { it.key == openSeedKey }
@@ -91,6 +134,7 @@ data class IdeasUiState(
 data class IdeasActions(
     val onRefresh: () -> Unit,
     val onFilterChange: (SeedStatus?) -> Unit,
+    val onLaneChange: (SeedLane) -> Unit,
     val onTagFilterChange: (String?) -> Unit,
     val onPlatformFilterChange: (Platform?) -> Unit,
     val onClearFilters: () -> Unit,
@@ -99,6 +143,8 @@ data class IdeasActions(
     val onAddManual: (String) -> Unit,
     val onSetBaseUrl: (String) -> Unit,
     val onCopy: (String) -> Unit,
+    /** Opens a harvested seed's original post in the browser or the X app. */
+    val onOpenLink: (String) -> Unit,
     val onAskDelete: (StoredSeed) -> Unit,
     val onToggleBubble: () -> Unit,
     val onOpenSetup: () -> Unit,
@@ -159,6 +205,7 @@ class IdeasActivity : ComponentActivity() {
                             onGenerate = { instruction -> generate(open, instruction) },
                             onDeleteIdea = { idea -> deleteIdea(open, idea) },
                             onCopy = ::copy,
+                            onOpenLink = ::openLink,
                             onSetStatus = { status -> setStatus(open, status) },
                             onDeleteSeed = { state = state.copy(pendingDelete = open) },
                         )
@@ -170,19 +217,26 @@ class IdeasActivity : ComponentActivity() {
                             actions = IdeasActions(
                                 onRefresh = ::refresh,
                                 onFilterChange = ::changeFilter,
+                                onLaneChange = ::changeLane,
                                 onTagFilterChange = { state = state.copy(tagFilter = it) },
                                 onPlatformFilterChange = {
                                     state = state.copy(platformFilter = it)
                                 },
                                 onClearFilters = {
-                                    state = state.copy(tagFilter = null, platformFilter = null)
-                                    changeFilter(null)
+                                    state = state.copy(
+                                        tagFilter = null,
+                                        platformFilter = null,
+                                        lane = SeedLane.ALL,
+                                        filter = null,
+                                    )
+                                    refresh()
                                 },
                                 onOpenSeed = ::openSeed,
                                 onSetStatus = ::setStatus,
                                 onAddManual = ::addManual,
                                 onSetBaseUrl = ::setBaseUrl,
                                 onCopy = ::copy,
+                                onOpenLink = ::openLink,
                                 onAskDelete = { state = state.copy(pendingDelete = it) },
                                 onToggleBubble = ::toggleBubble,
                                 onOpenSetup = ::openSetup,
@@ -211,16 +265,19 @@ class IdeasActivity : ComponentActivity() {
     private fun refresh() {
         state = state.copy(loading = true, message = null)
         val filter = state.filter
+        val lane = state.lane
 
         lifecycleScope.launch {
-            val outcome = withContext(Dispatchers.IO) { repository.loadSeeds(filter) }
+            val outcome = withContext(Dispatchers.IO) { repository.loadSeeds(filter, lane) }
             val pending = withContext(Dispatchers.IO) { repository.pendingCount }
             val streak = withContext(Dispatchers.IO) { repository.streak() }
 
             state = outcome.fold(
-                onSuccess = { seeds ->
+                onSuccess = { page ->
                     state.copy(
-                        seeds = seeds,
+                        seeds = page.seeds,
+                        harvestedCount = page.harvestedCount,
+                        mineCount = page.mineCount,
                         loading = false,
                         pendingCount = pending,
                         serverReachable = true,
@@ -230,13 +287,17 @@ class IdeasActivity : ComponentActivity() {
                 onFailure = { error ->
                     // Falling back to the last list plus the queue rather than an
                     // empty screen: those seeds exist, they just are not reachable.
-                    val queued = withContext(Dispatchers.IO) { repository.queuedSeeds(filter) }
+                    val queued = withContext(Dispatchers.IO) {
+                        repository.queuedSeeds(filter, lane)
+                    }
                     state.copy(
                         seeds = queued,
                         loading = false,
                         pendingCount = pending,
                         serverReachable = false,
-                        // Cached, so the streak survives the backend being away.
+                        // Counts are deliberately left as they were: they came
+                        // from the server and a stale total beats flashing the
+                        // tabs to zero every time the backend naps.
                         streak = streak,
                         message = error.message ?: "Could not reach the backend",
                     )
@@ -247,6 +308,14 @@ class IdeasActivity : ComponentActivity() {
 
     private fun changeFilter(filter: SeedStatus?) {
         state = state.copy(filter = filter)
+        refresh()
+    }
+
+    /** The lane is a server-side filter, so switching tab refetches. */
+    private fun changeLane(lane: SeedLane) {
+        // A tag chosen in one lane usually does not exist in the other, which
+        // would land you on an empty list you did not ask for.
+        state = state.copy(lane = lane, tagFilter = null)
         refresh()
     }
 
@@ -342,15 +411,28 @@ class IdeasActivity : ComponentActivity() {
      * straight in the place where you work on it rather than back in the list.
      */
     private fun addManual(note: String) {
+        // A typed idea lands in the "from me" lane, so adding one while looking
+        // at the harvested lane would file it somewhere you cannot see. Move to
+        // a lane that contains it rather than appearing to have lost it.
+        val lane = if (state.lane == SeedLane.HARVESTED) SeedLane.MINE else state.lane
+        val filter = state.filter
+
         lifecycleScope.launch {
             val clientSeedId = withContext(Dispatchers.IO) { repository.addManual(note) }
-            val outcome = withContext(Dispatchers.IO) { repository.loadSeeds(state.filter) }
-            val seeds = outcome.getOrElse {
-                withContext(Dispatchers.IO) { repository.queuedSeeds() }
+            val outcome = withContext(Dispatchers.IO) { repository.loadSeeds(filter, lane) }
+            val page = outcome.getOrElse {
+                IdeaBankApi.SeedPage(
+                    seeds = withContext(Dispatchers.IO) { repository.queuedSeeds(filter, lane) },
+                    harvestedCount = state.harvestedCount,
+                    mineCount = state.mineCount,
+                )
             }
-            val added = seeds.firstOrNull { it.clientSeedId == clientSeedId }
+            val added = page.seeds.firstOrNull { it.clientSeedId == clientSeedId }
             state = state.copy(
-                seeds = seeds,
+                seeds = page.seeds,
+                lane = lane,
+                harvestedCount = page.harvestedCount,
+                mineCount = page.mineCount,
                 // Only synced seeds can generate, so a queued one stays in the list.
                 openSeedKey = added?.takeIf { it.remoteId != null }?.key,
             )
@@ -400,6 +482,24 @@ class IdeasActivity : ComponentActivity() {
     private fun copy(text: String) {
         val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
         clipboard.setPrimaryClip(ClipData.newPlainText("idea", text))
+    }
+
+    /**
+     * Opens a harvested seed's original post. Android hands x.com links to the
+     * X app when it is installed, which is where you want to be to quote one.
+     *
+     * A seed can outlive the post it came from, so a link that resolves to
+     * nothing is a normal outcome rather than a bug; the only thing worth
+     * handling is there being no browser at all.
+     */
+    private fun openLink(url: String) {
+        if (url.isBlank()) return
+        val intent = android.content.Intent(
+            android.content.Intent.ACTION_VIEW,
+            android.net.Uri.parse(url),
+        ).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+        runCatching { startActivity(intent) }
+            .onFailure { toast("Nothing here can open that link") }
     }
 
     private fun toast(message: String) {

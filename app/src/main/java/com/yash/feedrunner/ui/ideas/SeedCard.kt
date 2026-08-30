@@ -59,7 +59,12 @@ import com.yash.feedrunner.ui.theme.HairlineCard
  * because a list of fully expanded seeds is unreadable at ten items.
  */
 @Composable
-internal fun SeedCard(seed: StoredSeed, onOpen: () -> Unit, onDelete: () -> Unit) {
+internal fun SeedCard(
+    seed: StoredSeed,
+    onOpen: () -> Unit,
+    onDelete: () -> Unit,
+    onOpenLink: (String) -> Unit = {},
+) {
     HairlineCard(
         modifier = Modifier.fillMaxWidth(),
         onClick = if (seed.isPending) null else onOpen,
@@ -121,6 +126,18 @@ internal fun SeedCard(seed: StoredSeed, onOpen: () -> Unit, onDelete: () -> Unit
                 }
             }
 
+            // A harvested seed still points at a live post, and for two kinds
+            // of seed you cannot act without going there: a quote post needs
+            // the original beside it, and an image post keeps its meaning in a
+            // picture this card cannot show. Both get one row, not two.
+            if (seed.hasLink && (seed.isRepost || seed.visual)) {
+                SourcePostRow(
+                    isRepost = seed.isRepost,
+                    visual = seed.visual,
+                    onClick = { onOpenLink(seed.sourcePostUrl) },
+                )
+            }
+
             // The one number worth surfacing in the list: whether this seed has
             // already produced posts you have not dealt with.
             if (seed.ideas.isNotEmpty()) {
@@ -133,6 +150,43 @@ internal fun SeedCard(seed: StoredSeed, onOpen: () -> Unit, onDelete: () -> Unit
                 )
             }
         }
+    }
+}
+
+/**
+ * The link back to the post a harvested seed came from.
+ *
+ * Its own tap target inside a card that is itself tappable, so the wording has
+ * to say where it goes: "open the post" lands in X, tapping anywhere else opens
+ * the thread. The reason comes first, because that is what makes you want it,
+ * and the two reasons combine into one line rather than stacking two rows.
+ */
+@Composable
+private fun SourcePostRow(isRepost: Boolean, visual: Boolean, onClick: () -> Unit) {
+    val reason = when {
+        isRepost && visual -> "quote this · has an image"
+        isRepost -> "quote this post"
+        else -> "has an image"
+    }
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .padding(top = Space.sm)
+            .clip(RoundedCornerShape(Radius.chip))
+            .clickable(onClick = onClick)
+            .padding(horizontal = Space.sm, vertical = Space.xs),
+    ) {
+        Text(
+            text = if (isRepost) "⇄" else "▣",
+            fontSize = 11.sp,
+            color = MaterialTheme.colorScheme.primary,
+        )
+        Text(
+            text = "  $reason  ·  open the post ↗",
+            style = MetaTextStyle,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.primary,
+        )
     }
 }
 

@@ -5,6 +5,7 @@ import android.util.Log
 import com.yash.feedrunner.ui.IdeaSeed
 import com.yash.feedrunner.ui.PostIdea
 import com.yash.feedrunner.ui.Platform
+import com.yash.feedrunner.ui.SeedLane
 import com.yash.feedrunner.ui.SeedSource
 import com.yash.feedrunner.ui.SeedStatus
 import com.yash.feedrunner.ui.StoredSeed
@@ -188,17 +189,25 @@ class IdeaBankRepository(context: Context) {
      * Everything to show in the Ideas screen, newest first. Flushes first so a
      * seed banked while offline appears as soon as the backend comes back.
      */
-    fun loadSeeds(filter: SeedStatus?): Result<List<StoredSeed>> {
+    fun loadSeeds(
+        filter: SeedStatus?,
+        lane: SeedLane = SeedLane.ALL,
+    ): Result<IdeaBankApi.SeedPage> {
         flush()
         // Picks queue up whenever the laptop is unreachable, and marking is not
         // something you do often enough to rely on as the only drain.
         flushPicks()
-        return runCatching { api.listSeeds(filter) }
-            .map { remote ->
+        return runCatching { api.listSeeds(filter, lane) }
+            .map { page ->
                 // Queued seeds are shown alongside so nothing is invisible.
+                // They are never harvested ones: the engine posts straight to
+                // the backend and has no outbox on this device.
                 val pending = outbox.pending()
                     .filter { filter == null || filter == SeedStatus.NEW }
-                (pending + remote).sortedByDescending { it.createdAtMillis }
+                    .filter { lane.accepts(it.source) }
+                page.copy(
+                    seeds = (pending + page.seeds).sortedByDescending { it.createdAtMillis },
+                )
             }
     }
 
@@ -207,9 +216,14 @@ class IdeaBankRepository(context: Context) {
      * anything still waiting to be sent. Read only in effect, but the bank is the
      * reason to open the screen and it should still be there.
      */
-    fun queuedSeeds(filter: SeedStatus? = null): List<StoredSeed> {
-        val queued = outbox.pending().filter { filter == null || filter == SeedStatus.NEW }
-        val cached = api.cachedSeeds(filter)
+    fun queuedSeeds(
+        filter: SeedStatus? = null,
+        lane: SeedLane = SeedLane.ALL,
+    ): List<StoredSeed> {
+        val queued = outbox.pending()
+            .filter { filter == null || filter == SeedStatus.NEW }
+            .filter { lane.accepts(it.source) }
+        val cached = api.cachedSeeds(filter, lane)
         // A seed can be in both: queued because the upload has not landed, cached
         // because an earlier fetch already saw it.
         val queuedIds = queued.map { it.clientSeedId }.toSet()

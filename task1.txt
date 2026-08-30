@@ -1,0 +1,10 @@
+- in feed engine also add a category of repost something which i can repost with a quote around that idea. so for that we also need to store the post link. do solve the db schema if needed for that.
+- also if there are any tweet where the image is compulsory for that, so for that include the post line for that as well so while posting i can refer to that.
+- also we need to show the seeded ideas frmo the engine seperately from the one which were seeded from the drafts, for that we can have a differnt tab. i'm leaving the ui and ux on you. make sure the both the ui, ux are good, elegant, and modern and friendly.
+- also take care of the side things which i may have missed, other ui things, edge cases, etc consider it by yourseft, at the end you can call out after implementing.
+- also we will be running the feed enging locally on this maching (windows) through task schedular or else, figure out and also set that up and test it as well. so later, we can enable it just through one click.
+- we also need to do the complete end to end testing of the flow, including the frontend, cron, experience, etc, etc. i'm connecting my phone.
+- pls keep maintain the session.md as well.
+- these are my twitter credentials do store it in feed engine and test as well. if it requires login etc
+username: <redacted>
+password: <redacted>

@@ -32,9 +32,63 @@ enum class SeedSource(val wire: String, val label: String) {
     HARVEST("harvest", "harvested"),
     ;
 
+    /**
+     * Which lane of the bank this belongs to. The engine files seeds far faster
+     * than replying does, so without the split a week of harvesting buries
+     * every seed that came from a post Yash actually engaged with.
+     */
+    val lane: SeedLane get() = if (this == HARVEST) SeedLane.HARVESTED else SeedLane.MINE
+
     companion object {
         fun fromWire(wire: String): SeedSource =
             entries.firstOrNull { it.wire == wire } ?: MANUAL
+    }
+}
+
+/**
+ * The top-level split of the bank: what the engine found while scrolling, and
+ * what came out of Yash's own replying and typing.
+ *
+ * They read differently and get used differently. A harvested seed is someone
+ * else's post he has never touched, so it still points at a live tweet. One of
+ * his own already carries his voice, via the reply he sent on it.
+ */
+enum class SeedLane(val label: String, val wire: String?) {
+    /** Both lanes. Sends no lane parameter, which is also what old servers get. */
+    ALL("All", null),
+    HARVESTED("Harvested", "harvested"),
+    MINE("From me", "mine"),
+    ;
+
+    fun accepts(source: SeedSource): Boolean = this == ALL || source.lane == this
+}
+
+/**
+ * The kind of post a harvested seed was judged best suited to become.
+ *
+ * Set by the harvesting engine only; seeds born from a capture leave it empty,
+ * because the register is chosen at generation time instead.
+ */
+enum class SeedCategory(val wire: String, val label: String, val hue: Color) {
+    TAKE("take", "take", Color(0xFF1D9BF0)),
+    SHITPOST("shitpost", "shitpost", Color(0xFFF5A623)),
+    BANTER("banter", "banter", Color(0xFFF5A623)),
+    WAR_STORY("war_story", "war story", Color(0xFFFF6B9D)),
+    THOUGHT("thought", "thought", Color(0xFF00BA7C)),
+    TREND("trend", "trend", Color(0xFF00B8D9)),
+
+    /**
+     * Quote this post rather than writing around it. The only category that
+     * needs the original to still be reachable, which is why a seed carrying
+     * it always carries a link too.
+     */
+    REPOST("repost", "repost", Color(0xFF7856FF)),
+    ;
+
+    companion object {
+        /** Null for the many seeds that have no category, which is not an error. */
+        fun fromWire(wire: String?): SeedCategory? =
+            entries.firstOrNull { it.wire == wire?.trim()?.lowercase() }
     }
 }
 
@@ -64,6 +118,18 @@ data class StoredSeed(
     val note: String = "",
     val postAuthor: String = "",
     val postText: String = "",
+    /** Harvest only: what kind of post this seed wants to become. */
+    val category: SeedCategory? = null,
+    /**
+     * Harvest only: the live permalink of the post this came from. Empty on
+     * everything else, since the phone has no link for what was on screen.
+     */
+    val sourcePostUrl: String = "",
+    /**
+     * The original carries an image, chart or video. Writing from one of these
+     * means opening it first, which is what the link above is for.
+     */
+    val visual: Boolean = false,
     val createdAtMillis: Long = 0L,
     /** Conversation about this seed, stored server-side so it follows the seed. */
     val chat: List<ChatMessage> = emptyList(),
@@ -75,6 +141,13 @@ data class StoredSeed(
     val rounds: Int = 0,
 ) {
     val isPending: Boolean get() = remoteId == null
+
+    /** A quote post you can actually make: the original is still reachable. */
+    val isRepost: Boolean
+        get() = category == SeedCategory.REPOST && sourcePostUrl.isNotBlank()
+
+    /** Whether there is an original worth offering to open. */
+    val hasLink: Boolean get() = sourcePostUrl.isNotBlank()
 
     /** The line that identifies this seed in a list. */
     val headline: String
