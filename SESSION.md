@@ -306,6 +306,25 @@ index migration. Release APK with invite field installed on device.
   undo, long-press context menu on cards, GitHub-heatmap streak, grid-reveal
   loader, emoji/leaf burst on pick, command palette for ideas search.
 
+## Twelfth round (2026-08-30): harvest engine prompt alignment — done
+
+- Yash is building an X-scrolling harvesting engine that seeds the bank
+  directly. Rewrote his filter prompt as backend prompts/harvest_filter.md
+  (e75c043), aligned to POST /seeds wire format: each output object is a
+  ready-to-store body. Key alignments: client_seed_id "harvest-<post id>"
+  (idempotent rescrapes), source "harvest" (NEW enum value, backend model +
+  app SeedSource d66ab22, label "harvested"), post_text preserved (<=300
+  chars verbatim — app thread header + ideation prompt need it), category
+  rides as FIRST theme tag (filterable in Ideas) plus its own key (server
+  ignores extra keys), shelf_life/tension/angle_hint 1:1 with schema and
+  reply.md's idea-seed vocabulary. Added: never seed @yashx_404's own posts;
+  engine contract section (captured_at_millis, vision ids, per-run caps).
+  Purpose preserved: category caps 3-4/batch, dedup, high bar, vision variant.
+- Live contract test on deployed backend: harvest seed stored (source=
+  harvest, tags ordered), duplicate:true on repost, deleted after. Green.
+- Device was unplugged: release APK with the "harvested" label NOT installed
+  yet; Desktop APK NOT refreshed. Do both on next adb connect.
+
 Nothing in flight. Next work starts fresh from this file.
 
 ## Known open items (older, not urgent)
