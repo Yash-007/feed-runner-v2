@@ -436,6 +436,28 @@ Two things the device caught that no test would have:
   session token dies when you sign out on the phone, which would silently stop
   the harvest.
 
+### Cron verified by firing it (2026-08-31, two runs)
+
+Run 1 FAILED, and the log did not say so: it ended `list done posts=0` with no
+error, because main() printed to stderr and nothing reads stderr under Task
+Scheduler. Two engine fixes came out of it — fatal errors now go through the
+logger, and `settle()` reloads once before giving up, because the failure was
+only X being slow to render (the same scrape worked four minutes later) and it
+cost the entire slot.
+
+Run 2 clean end to end, LastTaskResult 0: 50 posts, 32 kept, 9 seeds banked,
+9 pushed, 0 failed. Bank is now **23 harvested + 180 from me**, categories
+12 take / 3 repost / 3 banter / 2 shitpost / 2 trend / 1 thought, every one
+carrying a link, 9 visual, no duplicates.
+
+The em-dash scrub is confirmed on real data: the 12 seeds banked before the fix
+carry them, the 9 from the cron run carry none.
+
+Note the lesson about the earlier "verified" claim: the cron had been called
+verified on the strength of a `-stage push` wrapper test, which makes no browser
+or model calls and therefore never touched the part that broke. Wrapper tests
+prove the wrapper.
+
 Nothing in flight except the phone install. Next work starts fresh from this file.
 
 ## Known open items (older, not urgent)
