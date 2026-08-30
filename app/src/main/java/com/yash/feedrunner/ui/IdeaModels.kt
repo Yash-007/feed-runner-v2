@@ -27,6 +27,9 @@ enum class SeedSource(val wire: String, val label: String) {
     POST("post", "post"),
     QUOTE("quote", "quote"),
     MANUAL("manual", "mine"),
+
+    /** Filtered out of a scraped feed by the harvesting engine. */
+    HARVEST("harvest", "harvested"),
     ;
 
     companion object {
