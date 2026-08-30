@@ -325,7 +325,89 @@ index migration. Release APK with invite field installed on device.
 - Device was unplugged: release APK with the "harvested" label NOT installed
   yet; Desktop APK NOT refreshed. Do both on next adb connect.
 
-Nothing in flight. Next work starts fresh from this file.
+## Thirteenth round (2026-08-31): engine → bank integration + task1
+
+Machine changed: this is the WINDOWS laptop now, not the Mac. Phone is a Realme
+RMX3151 on Android 13 (SDK 33), not the OnePlus this file used to name.
+
+Environment traps found here (all fixed or worked around):
+- `gradle-wrapper.properties` pointed at `file:///Users/yash.agrawal/...`, a Mac
+  path. Repointed at services.gradle.org; the 8.10.2 dist was already cached.
+- System JDK is 23, which Gradle 8.10.2 refuses to run on. Build with
+  `JAVA_HOME=~/.gradle/jdks/eclipse_adoptium-17-amd64-windows.2`.
+- *** THE APK ON THE PHONE IS MAC-DEBUG-SIGNED. Anything built here fails with
+  INSTALL_FAILED_UPDATE_INCOMPATIBLE. Installing requires `adb uninstall
+  com.yash.feedrunner` first, which drops overlay + accessibility (manual
+  re-grant) and the session token (sign in again as yashx_404). Server-side
+  data is untouched. NOT DONE — waiting on Yash. ***
+
+Shipped, all three repos, pushed (backend deployed to Render):
+
+- **Engine → bank push** (the main open integration, now closed). New
+  `internal/bank`; `posted_at` column is the outbox, so a run that finds the
+  backend asleep leaves rows unstamped and the next one retries.
+  `client_seed_id` makes the retry safe (server answers duplicate). Off by
+  default, refuses to start without a token. `-stage push` drains the queue
+  with no browser and no model calls.
+- **`repost` category**: posts worth quote-tweeting rather than writing around.
+  The one exception to transform-never-copy, so the prompts give it a higher
+  bar (punch up only, never a small account). A repost seed with no permalink
+  is demoted to a take — a quote post with nothing to quote is an action with
+  no target.
+- **`source_post_url` / `source_post_id` / `category` / `visual` now survive to
+  the backend.** They were dropped at the API boundary before: SeedInput had no
+  fields for them, so the engine's whole reason for knowing the permalink died
+  there. `visual` means "the original carries media", NOT "we screenshotted
+  it" — the reader needs to know there is an image to look at either way.
+- **Lanes.** `GET /seeds?lane=harvested|mine`, counts of both on every listing.
+  App has All / Harvested / From me tabs. Server-side on purpose: the app
+  fetches the newest few hundred rows, and at ~20 harvested seeds a day a
+  client-side split would be filtering a window that already lost the answer.
+- **Ideation knows harvest seeds**: new QUOTE_POST play writes the line that
+  sits above someone else's post; the visual flag tells it not to invent a
+  detail it cannot see.
+- **Scheduling is one double-click**: `scripts/feed-engine-{enable,disable,
+  run-now,status}.cmd` over a new `preflight.ps1` that checks binary, driver,
+  claude on PATH, Chrome, profile, token and task state.
+- **Tests**: first ones in the backend at all (wire format, lanes); engine
+  gained assemble/bank/outbox suites. Two real bugs caught by them — a rejected
+  category survived as a theme tag (the phantom filter chip it was meant to
+  prevent), and the partial index over `posted_at` sat in the schema block
+  which runs before the ALTER, so every pre-existing bank failed to open.
+
+Verified live this round (deployed backend, real account):
+- POST /seeds with all new fields round-trips; duplicate:true on repost; bad
+  lane 400s; probe seed deleted after.
+- Engine scrape: 50 posts, 4 shots, 2m48s, selectors healthy (202 articles,
+  misses text:23 time:37 — well under the 0.8 alarm). Profile still signed in.
+- Full seed pass: 50 posts → 20 kept → 7 seeds → banked → pushed. Zero failed.
+- Re-push is a no-op; un-stamping a row and re-pushing answers duplicate and
+  creates no second copy.
+- Bank now 14 harvested + 180 mine. Categories: 9 take, 2 banter, 1 repost,
+  1 trend, 1 shitpost. All 14 carry a link; 5 are visual.
+- QUOTE_POST ideation on the repost seed returned a proper one-line quote.
+- Task Scheduler registered (09:17 / 14:43 / 21:09). run.ps1 wrapper verified
+  (lock taken and released, args passed, exit 0).
+
+NOT yet verified: anything on the phone. The app changes are compile-clean and
+the release APK is built at app/build/outputs/apk/release/app-release.apk, but
+nothing has been installed or eyeballed because of the signing mismatch above.
+
+## Credentials note (2026-08-31)
+
+- X account for the harvester: `<redacted>`, stored in `feed-engine/
+  config.local.yaml` (gitignored, verified). Password is plaintext on disk
+  there, and was pasted into a chat transcript, so **rotate it when convenient**.
+  `login.auto_login` is false: assisted login fills the two fields and then
+  waits for a human, because X interleaves a challenge or 2FA often enough that
+  unattended login mostly fails confusingly. The profile is currently signed in,
+  so none of this is exercised day to day.
+- `bank.token` in config.local.yaml is the shared Render API_TOKEN (resolves to
+  OWNER_USERNAME yashx_404). Chosen over a phone session token deliberately: a
+  session token dies when you sign out on the phone, which would silently stop
+  the harvest.
+
+Nothing in flight except the phone install. Next work starts fresh from this file.
 
 ## Known open items (older, not urgent)
 
