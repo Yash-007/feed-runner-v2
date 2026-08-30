@@ -58,6 +58,7 @@ import com.yash.feedrunner.ui.Platform
 import com.yash.feedrunner.ui.SeedLane
 import com.yash.feedrunner.ui.SeedStatus
 import com.yash.feedrunner.ui.theme.SegmentedControl
+import com.yash.feedrunner.ui.theme.VerticalHairline
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.focus.focusRequester
@@ -327,6 +328,20 @@ private fun LaneTabs(
     )
 }
 
+/**
+ * Status, platform and topic, in one row that scrolls.
+ *
+ * These were three stacked rows. With the lane tabs above them that put four
+ * rows of controls between the header and the first idea, about a third of the
+ * screen, and the bank stopped reading as a list of ideas and started reading
+ * as a filter panel. The same complaint the seed cards got, one level up.
+ *
+ * Status leads because it is the one used daily. Platform only appears with
+ * both networks in the bank. Topics fold behind a chip, because there are up to
+ * eight of them and they are for hunting something specific, not for glancing
+ * at; the chip carries the active one so a filter is never hidden while it is
+ * doing something.
+ */
 @Composable
 private fun FilterBar(
     status: SeedStatus?,
@@ -338,16 +353,31 @@ private fun FilterBar(
     onTag: (String?) -> Unit,
     onPlatform: (Platform?) -> Unit,
 ) {
+    var topicsOpen by remember { mutableStateOf(false) }
+    // An active tag has to stay visible even if the row is folded away.
+    val showTopics = topicsOpen || tag != null
+
     Column {
-        // Hidden until the bank holds seeds from both networks; a filter with
-        // one possible answer is noise.
-        if (platforms.size > 1) {
-            Row(
-                modifier = Modifier
-                    .padding(start = 16.dp, end = 16.dp, top = 10.dp)
-                    .horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(7.dp),
-            ) {
+        Row(
+            modifier = Modifier
+                .padding(horizontal = 16.dp, vertical = 10.dp)
+                .horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(7.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            FilterChip(label = "all", active = status == null, onClick = { onStatus(null) })
+            SeedStatus.entries.forEach { entry ->
+                FilterChip(
+                    label = entry.label,
+                    active = status == entry,
+                    onClick = { onStatus(entry) },
+                )
+            }
+
+            // Hidden until the bank holds seeds from both networks; a filter
+            // with one possible answer is noise.
+            if (platforms.size > 1) {
+                VerticalHairline(height = 18.dp, modifier = Modifier.padding(horizontal = Space.xs))
                 platforms.forEach { entry ->
                     val active = platform == entry
                     Text(
@@ -364,24 +394,41 @@ private fun FilterBar(
                     )
                 }
             }
-        }
-        Row(
-            modifier = Modifier
-                .padding(horizontal = 16.dp, vertical = 10.dp)
-                .horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(7.dp),
-        ) {
-            FilterChip(label = "all", active = status == null, onClick = { onStatus(null) })
-            SeedStatus.entries.forEach { entry ->
-                FilterChip(
-                    label = entry.label,
-                    active = status == entry,
-                    onClick = { onStatus(entry) },
+
+            if (tags.size > 1) {
+                VerticalHairline(height = 18.dp, modifier = Modifier.padding(horizontal = Space.xs))
+                Text(
+                    text = when {
+                        tag != null -> "$tag  ✕"
+                        topicsOpen -> "topics  ▴"
+                        else -> "topics  ▾"
+                    },
+                    style = MaterialTheme.typography.labelMedium,
+                    color = if (tag != null) {
+                        MaterialTheme.colorScheme.onPrimaryContainer
+                    } else {
+                        MaterialTheme.colorScheme.primary
+                    },
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(Radius.chip))
+                        .background(
+                            if (tag != null) {
+                                MaterialTheme.colorScheme.primaryContainer
+                            } else {
+                                MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)
+                            },
+                        )
+                        .clickable {
+                            // Tapping the chip while a tag is on clears it,
+                            // which is what the ✕ is promising.
+                            if (tag != null) onTag(null) else topicsOpen = !topicsOpen
+                        }
+                        .padding(horizontal = Space.md, vertical = Space.sm),
                 )
             }
         }
-        // Tags only appear once there is more than one to choose between.
-        if (tags.size > 1) {
+
+        AnimatedVisibility(visible = showTopics && tags.size > 1) {
             Row(
                 modifier = Modifier
                     .padding(start = 16.dp, end = 16.dp, bottom = 8.dp)

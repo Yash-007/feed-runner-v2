@@ -389,9 +389,38 @@ Verified live this round (deployed backend, real account):
 - Task Scheduler registered (09:17 / 14:43 / 21:09). run.ps1 wrapper verified
   (lock taken and released, args passed, exit 0).
 
-NOT yet verified: anything on the phone. The app changes are compile-clean and
-the release APK is built at app/build/outputs/apk/release/app-release.apk, but
-nothing has been installed or eyeballed because of the signing mismatch above.
+### On-device verification (same round, after Yash approved the reinstall)
+
+Uninstalled and reinstalled. ColorOS blocks adb from granting either permission
+(`appops set` wants MANAGE_APP_OPS_MODES, `settings put secure` wants
+WRITE_SECURE_SETTINGS), so **both had to be re-granted by hand** — worth knowing
+before planning any future reinstall. Opened the two Settings screens by intent
+to make it two taps. Yash signed back in as yashx_404.
+
+Verified on the phone:
+- Lane tabs render: All 194 / Harvested 14 / From me 180, counts from the
+  server, active tab drops its own count.
+- Tapping Harvested refetches, shows only harvested, and the platform chips
+  correctly disappear (that lane is all X, and a filter with one answer is
+  noise).
+- Repost seed card shows "⇄ quote this post · open the post ↗".
+- Thread shows the original-post card: "quote this" chip, @MParakhin, the
+  quoted text, "open ↗".
+- "open ↗" hands off to the X app (com.twitter.android). You land where you
+  would actually write the quote.
+- The 4 QUOTE_POST/SINGLE_SEED ideas generated earlier are in the thread.
+
+Two things the device caught that no test would have:
+- **Four rows of filters** between the header and the first idea, about a third
+  of the screen. Same complaint the seed cards got in the polish pass, one level
+  up. Status + platform + topics are now ONE scrolling row, with topics folded
+  behind a chip that carries the active tag. Two rows total; a whole extra seed
+  card fits.
+- **An em dash in an angle hint.** Seed prose never passed through the backend's
+  scrub, so `claude -p` output reached the bank raw. Fixed in the engine.
+  NOTE: the 14 already-banked seeds still have them — POST /seeds is
+  insert-only, so backfilling would mean deleting and re-pushing seeds that
+  already have generated ideas hanging off them. Judged not worth it.
 
 ## Credentials note (2026-08-31)
 
